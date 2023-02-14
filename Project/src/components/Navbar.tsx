@@ -37,12 +37,11 @@ function Navbar() {
   /* This renders the buttons above... Edit me! */
   display: inline-block;
   width: 11rem;
-
+  margin-left: 1rem;
 `
   return (
     <AppBar position="fixed" color="transparent" sx={{backgroudColor: 'rgba(217, 217, 217, 0.01)', border: "1px solid rgba(0, 0, 0, 0.35)",  boxShadow: 'none'}}>
-      <Container maxWidth="xl">
-        <Toolbar disableGutters>
+        <Toolbar disableGutters sx={{width:'99%'}}>
           <Logo src={LogoImage} alt="logo" />
           <Box sx={{ flexGrow: 1, display: { xs: 'flex', md: 'none' } }}>
             
@@ -82,7 +81,6 @@ function Navbar() {
             </Menu>
           </Box>
         </Toolbar>
-      </Container>
     </AppBar>
   );
 }
