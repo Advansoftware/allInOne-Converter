@@ -8,8 +8,8 @@ services:
     tty: true
     volumes:
       - ./Project:/app
-    environment:
-      NODE_ENV: development
     working_dir: /app
     ports:
       - '9001:5173'
+    environment:
+      - CHOKIDAR_USEPOLLING=true
