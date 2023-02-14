@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  server-node:
+    container_name: node-react
+    build: infra/web-server/node
+    entrypoint: "/usr/local/bin/node-entrypoint.sh"
+    tty: true
+    volumes:
+      - ./Project:/app
+    environment:
+      NODE_ENV: development
+    working_dir: /app
+    ports:
+      - '9001:5173'
