@@ -1,0 +1,1 @@
+nessa versão o sistema de conversão é controlado pelo bd, há o botão de upload que torna opcinal o upload e bloqueia esses botões e os botões de remover quando é iniciado a conversão
