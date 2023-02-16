@@ -14,6 +14,7 @@ import MenuItem from '@mui/material/MenuItem';
 import AdbIcon from '@mui/icons-material/Adb';
 import LogoImage from '../assets/logo_white.png'
 import styled from 'styled-components';
+import ButtonConverter from './ButtonConverter';
 const settings = ['Profile', 'Account', 'Dashboard', 'Logout'];
 
 function Navbar() {
@@ -50,8 +51,13 @@ function Navbar() {
           <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' } }}>
            
           </Box>
-
+          <Box mr={2}>
+            <ButtonConverter onClick={()=>console.log('clicou')}>
+              Converter
+            </ButtonConverter>
+          </Box>
           <Box sx={{ flexGrow: 0 }}>
+          
             <Tooltip title="Open settings">
               <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
                 <Avatar alt="Remy Sharp" src="https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1" />
