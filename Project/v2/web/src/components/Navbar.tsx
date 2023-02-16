@@ -15,9 +15,9 @@ import AdbIcon from '@mui/icons-material/Adb';
 import LogoImage from '../assets/logo_white.png'
 import styled from 'styled-components';
 import ButtonConverter from './ButtonConverter';
-const settings = ['Profile', 'Account', 'Dashboard', 'Logout'];
+const settings = ['Minha Conta','Sair'];
 
-function Navbar() {
+function Navbar({setOpenModal}) {
   const [anchorElNav, setAnchorElNav] = React.useState<null | HTMLElement>(null);
   const [anchorElUser, setAnchorElUser] = React.useState<null | HTMLElement>(null);
   const handleOpenNavMenu = (event: React.MouseEvent<HTMLElement>) => {
@@ -52,7 +52,7 @@ function Navbar() {
            
           </Box>
           <Box mr={2}>
-            <ButtonConverter onClick={()=>console.log('clicou')}>
+            <ButtonConverter onClick={setOpenModal}>
               Converter
             </ButtonConverter>
           </Box>
