@@ -13,7 +13,9 @@ use Illuminate\Support\Facades\Route;
 | be assigned to the "api" middleware group. Make something great!
 |
 */
-
+Route::get('/teste', function () {
+    return response()->json(['message' => 'Jobs API', 'status' => 'Connected']);;
+});
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
