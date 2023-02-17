@@ -15,7 +15,7 @@ services:
       - CHOKIDAR_USEPOLLING=true
     networks:
       allone-converter:
-        ipv4_address: 172.21.0.1
+        ipv4_address: 172.21.0.2
 
   server-api:
     container_name: web-server-api-allone-converter
@@ -28,7 +28,7 @@ services:
       - ./Project:/var/www/html
     networks:
       allone-converter:
-        ipv4_address: 172.21.0.2
+        ipv4_address: 172.21.0.3
 
   server-data-base:
     container_name: data-base-allone-converter
@@ -44,7 +44,7 @@ services:
      MYSQL_PASSWORD: allone-converter
     networks:
       allone-converter:
-        ipv4_address: 172.21.0.3
+        ipv4_address: 172.21.0.4
 
 networks:
   allone-converter:
