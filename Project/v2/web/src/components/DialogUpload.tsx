@@ -1,24 +1,33 @@
-import * as React from 'react';
 import Button from '@mui/material/Button';
 import * as Mui from '@mui/material/styles';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
 import IconButton from '@mui/material/IconButton';
 import CloseIcon from '@mui/icons-material/Close';
 import Typography from '@mui/material/Typography';
 import ModalImage from '../assets/modalImage.svg';
-import { Grid } from '@mui/material';
+import { Box, Grid, TextField } from '@mui/material';
+import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import styled from 'styled-components';
+import { useState } from 'react';
 
 const BootstrapDialog = Mui.styled(Dialog)(({ theme }) => ({
   '& .MuiDialogContent-root': {
     padding: theme.spacing(2),
   },
-  '& .MuiDialogActions-root': {
-    padding: theme.spacing(1),
+  '& .MuiDialog-container': {
+    backdropFilter: 'blur(3px)',
   },
+  
+}));
+const InputDialog = Mui.styled(TextField)(({ theme }) => ({
+  '& .MuiFilledInput-root': {
+    borderRadius: '0px'
+  },
+  '& .MuiFilledInput-root:before': {
+    borderBottom: "1px solid #FD2C2C"
+  }
   
 }));
 const Logo = styled.img`
@@ -55,7 +64,7 @@ function BootstrapDialogTitle(props: DialogTitleProps) {
 }
 
 export default function DialogUpload({open, setOpen}) {
-
+  const [url, setUrl] = useState('');
   const handleClose = () => {
     setOpen(false);
   };
@@ -64,11 +73,12 @@ export default function DialogUpload({open, setOpen}) {
     <div>
       <BootstrapDialog
         fullWidth
+        scroll='body'
         maxWidth='md'
         open={open}
       >
         <BootstrapDialogTitle id="customized-dialog-title" onClose={handleClose}>
-          Enviar Videos
+          Enviar Video
         </BootstrapDialogTitle>
         <DialogContent dividers>
           <Grid container justifyContent='center' spacing={2} alignSelf='center'>
@@ -76,7 +86,7 @@ export default function DialogUpload({open, setOpen}) {
               <Logo src={ModalImage} alt="Modal Image"/>
             </Grid>
             <Grid item>
-            <Typography variant='h5' sx={{textAlign: 'center'}} m={2}>
+            <Typography variant='h5' sx={{textAlign: 'center'}} m={1}>
               Arraste e solte os arquivos de vídeo para fazer o envio
             </Typography>
             </Grid>
@@ -84,6 +94,30 @@ export default function DialogUpload({open, setOpen}) {
             <Button autoFocus onClick={handleClose} variant="contained" color="error">
               Selecionar Arquivos
             </Button>
+            </Grid>
+            <Grid item xs={12} textAlign='center'>
+            <Typography variant='h6' sx={{textAlign: 'center'}} >
+              Ou
+            </Typography>
+            </Grid>
+            <Grid item xs={12} md={6} textAlign='center'>
+            <Box sx={{ display: 'flex', alignItems: 'flex-end' }}> 
+            <InputDialog 
+               fullWidth label="Digite a url" variant="filled"
+               color='error'
+               sx={{borderBottom: "1px solid #FD2C2C"}}
+               onChange={(e)=>setUrl(e.target.value)}
+            />
+            <CloudDownloadIcon 
+              onClick={()=>console.log(url)}
+              sx={{
+                padding: '1.05rem 1rem',
+                backgroundColor: '#FD2C2C', 
+                cursor: 'pointer'
+              }}
+            />
+          </Box>
+            
             </Grid>
           </Grid>
         </DialogContent>
