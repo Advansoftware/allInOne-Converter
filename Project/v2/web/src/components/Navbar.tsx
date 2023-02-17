@@ -15,9 +15,16 @@ import AdbIcon from '@mui/icons-material/Adb';
 import LogoImage from '../assets/logo_white.png'
 import styled from 'styled-components';
 import ButtonConverter from './ButtonConverter';
-const settings = ['Profile', 'Account', 'Dashboard', 'Logout'];
+const settings = ['Minha Conta','Sair'];
 
-function Navbar() {
+const Logo = styled.img`
+/* This renders the buttons above... Edit me! */
+display: inline-block;
+width: 11rem;
+margin-left: 1rem;
+`;
+
+function Navbar({setOpenModal}) {
   const [anchorElNav, setAnchorElNav] = React.useState<null | HTMLElement>(null);
   const [anchorElUser, setAnchorElUser] = React.useState<null | HTMLElement>(null);
   const handleOpenNavMenu = (event: React.MouseEvent<HTMLElement>) => {
@@ -34,12 +41,7 @@ function Navbar() {
   const handleCloseUserMenu = () => {
     setAnchorElUser(null);
   };
-  const Logo = styled.img`
-  /* This renders the buttons above... Edit me! */
-  display: inline-block;
-  width: 11rem;
-  margin-left: 1rem;
-`
+
   return (
     <AppBar position="fixed" color="transparent" sx={{backgroudColor: 'rgba(217, 217, 217, 0.01)', border: "1px solid rgba(0, 0, 0, 0.35)",  boxShadow: 'none'}}>
         <Toolbar disableGutters sx={{width:'99%'}}>
@@ -52,7 +54,7 @@ function Navbar() {
            
           </Box>
           <Box mr={2}>
-            <ButtonConverter onClick={()=>console.log('clicou')}>
+            <ButtonConverter onClick={setOpenModal}>
               Converter
             </ButtonConverter>
           </Box>
