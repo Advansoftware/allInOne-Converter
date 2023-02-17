@@ -10,7 +10,7 @@ import ModalImage from '../assets/modalImage.svg';
 import { Box, Grid, TextField } from '@mui/material';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import styled from 'styled-components';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 const BootstrapDialog = Mui.styled(Dialog)(({ theme }) => ({
   '& .MuiDialogContent-root': {
@@ -65,6 +65,14 @@ function BootstrapDialogTitle(props: DialogTitleProps) {
 
 export default function DialogUpload({open, setOpen}) {
   const [url, setUrl] = useState('');
+  const handleSubmitEnter = (e) =>{
+    if(e.key==='Enter'&&url!==''){
+      console.log(url)
+    }
+  }
+  const handleSubmit = (e)=>{
+    console.log(url);
+  }
   const handleClose = () => {
     setOpen(false);
   };
@@ -107,9 +115,10 @@ export default function DialogUpload({open, setOpen}) {
                color='error'
                sx={{borderBottom: "1px solid #FD2C2C"}}
                onChange={(e)=>setUrl(e.target.value)}
+               onKeyDown={handleSubmitEnter}
             />
             <CloudDownloadIcon 
-              onClick={()=>console.log(url)}
+              onClick={handleSubmit}
               sx={{
                 padding: '1.05rem 1rem',
                 backgroundColor: '#FD2C2C', 
@@ -117,7 +126,6 @@ export default function DialogUpload({open, setOpen}) {
               }}
             />
           </Box>
-            
             </Grid>
           </Grid>
         </DialogContent>
