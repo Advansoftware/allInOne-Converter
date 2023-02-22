@@ -28,9 +28,8 @@ const UploadPage = ({setStarter, setVideo, video, starter, setUrl, url}) =>{
 return(<>
  <Grid container justifyContent='center' spacing={2} alignSelf='center'>
     <Dropzone
-      accept="image/*"
       disabled={!!video.length ? true : false}
-      files={video}
+      files={video||null}
       onDrop={handleDrop}
       setStarter={setStarter}
     />

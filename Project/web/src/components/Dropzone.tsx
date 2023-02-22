@@ -8,7 +8,6 @@ const Logo = styled.img`
   width: 12rem;
 `;
 const Dropzone = ({
-    accept,
     disabled,
     setStarter,
     submitFile,
@@ -24,17 +23,11 @@ const Dropzone = ({
     noDragEventsBubbling,
     noKeyboard,
     onDrop,
-    onDropAccepted,
-    onDropRejected,
-    onFileDialogCancel,
-    onRemove,
-    onRemoveAll,
-    onUpload,
-    preventDropOnDocument
+
 }) => {
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
-    accept,
+    accept:{'video/*':[], 'audio/*':[], 'image/*':[]},
     maxFiles: 1,
     maxSize,
     disabled,
@@ -69,46 +62,6 @@ const Dropzone = ({
             Selecionar Arquivos
           </Button>
         </Grid>
-        {console.log(files[0])}
-      {/*   {files.length > 0 && (
-        <Box sx={{ mt: 2 }}>
-          <List>
-            <ListItem
-              key={useDropzone.path}
-              sx={{
-                border: 1,
-                borderColor: "divider",
-                borderRadius: 1,
-                "& + &": {
-                  mt: 1,
-                },
-              }}
-            > */}
-              {/* <ListItemIcon>
-                <DuplicateIcon fontSize="small" />
-              </ListItemIcon> */}
-            {/*   <ListItemText
-                primary={files[0].name}
-                primaryTypographyProps={{
-                  color: "textPrimary",
-                  variant: "subtitle2",
-                }}
-                secondary={files[0].size}
-              />
-              { submitFile && (
-                <>Enviando</>
-              )}
-            </ListItem>
-          </List>
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "flex-end",
-              mt: 2,
-            }}
-          ></Box>
-        </Box>
-      )} */}
       </div>
   );
 };
