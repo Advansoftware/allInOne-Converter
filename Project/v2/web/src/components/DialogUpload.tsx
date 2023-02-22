@@ -65,6 +65,7 @@ function BootstrapDialogTitle(props: DialogTitleProps) {
 
 export default function DialogUpload({open, setOpen}) {
   const [url, setUrl] = useState('');
+  const [openFile, setOpenFile] = useState(false);
   const handleSubmitEnter = (e) =>{
     if(e.key==='Enter'&&url!==''){
       console.log(url)
