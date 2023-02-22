@@ -7,10 +7,11 @@ import IconButton from '@mui/material/IconButton';
 import CloseIcon from '@mui/icons-material/Close';
 import Typography from '@mui/material/Typography';
 import ModalImage from '../assets/modalImage.svg';
-import { Box, Grid, TextField } from '@mui/material';
+import { Box, Divider, Grid, TextField } from '@mui/material';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import styled from 'styled-components';
-import { useRef, useState } from 'react';
+import CloudSyncOutlinedIcon from '@mui/icons-material/CloudSyncOutlined';
+import { useCallback, useRef, useState } from 'react';
 import Dropzone from './Dropzone';
 
 const BootstrapDialog = Mui.styled(Dialog)(({ theme }) => ({
@@ -67,6 +68,8 @@ function BootstrapDialogTitle(props: DialogTitleProps) {
 export default function DialogUpload({open, setOpen}) {
   const [url, setUrl] = useState('');
   const [openFile, setOpenFile] = useState(false);
+  const [video, setVideo] = useState([]);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const handleSubmitEnter = (e) =>{
     if(e.key==='Enter'&&url!==''){
       console.log(url)
@@ -92,20 +95,31 @@ export default function DialogUpload({open, setOpen}) {
         </BootstrapDialogTitle>
         <DialogContent dividers>
           <Grid container justifyContent='center' spacing={2} alignSelf='center'>
+          {/* <Dropzone 
+            accept="image/*"
+            disabled={!!files.length ? true : false}
+            files={files}
+            imageS3={img}
+            onDrop={handleDrop}
+            onRemove={handleRemove}
+          > */}
+            <>
             <Grid item xs={12} sx={{textAlign: 'center'}}>
               <Logo src={ModalImage} alt="Modal Image"/>
             </Grid>
             <Grid item>
-              <Dropzone open={openFile}/>
+              
             <Typography variant='h5' sx={{textAlign: 'center'}} m={1}>
               Arraste e solte os arquivos de vídeo para fazer o envio
             </Typography>
             </Grid>
             <Grid item xs={12} textAlign='center'>
-            <Button autoFocus onClick={handleClose} variant="contained" color="error">
+            <Button autoFocus onClick={()=>setOpenFile(true)} variant="contained" color="error">
               Selecionar Arquivos
             </Button>
             </Grid>
+            </>
+            {/* </Dropzone> */}
             <Grid item xs={12} textAlign='center'>
             <Typography variant='h6' sx={{textAlign: 'center'}} >
               Ou
@@ -131,6 +145,20 @@ export default function DialogUpload({open, setOpen}) {
           </Box>
             </Grid>
           </Grid>
+          {uploadProgress>0&&(<>
+            <Divider sx={{marginY: 2}}/>
+            <Grid container spacing={2}>
+            <Grid item>
+            <CloudSyncOutlinedIcon htmlColor="#7184fb" /> 
+            </Grid>
+            <Grid item>
+              <Typography variant='caption' color="textSecondary">
+              Enviando: {uploadProgress}%
+              </Typography>
+            </Grid>
+            </Grid>  
+          </>)}
+          
         </DialogContent>
       </BootstrapDialog>
     </div>
