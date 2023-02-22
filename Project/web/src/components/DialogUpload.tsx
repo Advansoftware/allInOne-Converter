@@ -11,6 +11,7 @@ import { Box, Grid, TextField } from '@mui/material';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import styled from 'styled-components';
 import { useRef, useState } from 'react';
+import Dropzone from './Dropzone';
 
 const BootstrapDialog = Mui.styled(Dialog)(({ theme }) => ({
   '& .MuiDialogContent-root': {
@@ -95,6 +96,7 @@ export default function DialogUpload({open, setOpen}) {
               <Logo src={ModalImage} alt="Modal Image"/>
             </Grid>
             <Grid item>
+              <Dropzone open={openFile}/>
             <Typography variant='h5' sx={{textAlign: 'center'}} m={1}>
               Arraste e solte os arquivos de vídeo para fazer o envio
             </Typography>
