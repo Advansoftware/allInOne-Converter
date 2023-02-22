@@ -1,14 +1,18 @@
-import { Box, List, ListItem, ListItemIcon, ListItemText } from "@mui/material";
-import PropTypes from "prop-types";
+import {useEffect} from 'react';
+import { Box, Button, Grid, List, ListItem, ListItemIcon, ListItemText, Typography } from "@mui/material";
 import { useDropzone } from "react-dropzone";
+import styled from 'styled-components';
+import ModalImage from '../assets/modalImage.svg';
 
-const FileDropzone = (props) => {
-  const {
-    children,
+const Logo = styled.img`
+  width: 12rem;
+`;
+const Dropzone = ({
     accept,
-    imageS3,
     disabled,
+    setStarter,
     submitFile,
+    setOpenFile,
     files,
     getFilesFromEvent,
     maxFiles,
@@ -26,51 +30,47 @@ const FileDropzone = (props) => {
     onRemove,
     onRemoveAll,
     onUpload,
-    preventDropOnDocument,
-    resolution,
-    ...other
-  } = props;
-  // We did not add the remaining props to avoid component complexity
-  // but you can simply add it if you need to.
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    preventDropOnDocument
+}) => {
+
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     accept,
     maxFiles: 1,
     maxSize,
     disabled,
     multiple: false,
+    noClick: true,
+    noKeyboard: true,
     minSize,
     onDrop,
   });
+  useEffect(()=>{
+    if(disabled){
+      setStarter(true);
+    }
+  },[disabled]);
 
   return (
-    <div {...other}>
-      <Box
-        sx={{
-          alignItems: "center",
-          border: 1,
-          borderRadius: 1,
-          borderColor: "divider",
-          display: "flex",
-          flexWrap: "wrap",
-          justifyContent: "center",
-          outline: "none",
-          p: 6,
-          ...(isDragActive && {
-            backgroundColor: "action.active",
-            opacity: 0.5,
-          }),
-          "&:hover": {
-            backgroundColor: "action.hover",
-            cursor: "pointer",
-            opacity: 0.5,
-          },
-        }}
-        {...getRootProps()}
-      >
-        <input {...getInputProps()} />
-      </Box>
 
-      {files.length > 0 && (
+      <div {...getRootProps()}>
+
+        <input {...getInputProps()} />
+
+        <Grid item xs={12} sx={{textAlign: 'center'}}>
+          <Logo src={ModalImage} alt="Modal Image"/>
+        </Grid>
+        <Grid item>
+          <Typography variant='h5' sx={{textAlign: 'center'}} m={1}>
+            Arraste e solte os arquivos de vídeo para fazer o envio
+          </Typography>
+        </Grid>
+        <Grid item xs={12} textAlign='center'>
+          <Button autoFocus onClick={open} variant="contained" color="error" disabled={disabled}>
+            Selecionar Arquivos
+          </Button>
+        </Grid>
+        {console.log(files[0])}
+      {/*   {files.length > 0 && (
         <Box sx={{ mt: 2 }}>
           <List>
             <ListItem
@@ -83,11 +83,11 @@ const FileDropzone = (props) => {
                   mt: 1,
                 },
               }}
-            >
-              <ListItemIcon>
+            > */}
+              {/* <ListItemIcon>
                 <DuplicateIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText
+              </ListItemIcon> */}
+            {/*   <ListItemText
                 primary={files[0].name}
                 primaryTypographyProps={{
                   color: "textPrimary",
@@ -95,19 +95,8 @@ const FileDropzone = (props) => {
                 }}
                 secondary={files[0].size}
               />
-              {!imageS3 && submitFile && (
-                /*  <div>
-                   <CircularProgressbar
-                     styles={{
-                       root: { width: 35 },
-                       path: { stroke: '#688eff' }
-                     }}
-                     strokeWidth={10}
-                     value={60}
-                   />
-                 </div> */
-
-                <LoadingWidget title="Enviando" />
+              { submitFile && (
+                <>Enviando</>
               )}
             </ListItem>
           </List>
@@ -119,39 +108,10 @@ const FileDropzone = (props) => {
             }}
           ></Box>
         </Box>
-      )}
-    </div>
+      )} */}
+      </div>
   );
 };
 
-FileDropzone.propTypes = {
-  accept: PropTypes.oneOfType([
-    PropTypes.string,
-    PropTypes.arrayOf(PropTypes.string),
-  ]),
-  disabled: PropTypes.bool,
-  files: PropTypes.array,
-  getFilesFromEvent: PropTypes.func,
-  maxFiles: PropTypes.number,
-  imageS3: PropTypes.string,
-  maxSize: PropTypes.number,
-  multiple: PropTypes.bool,
-  noClick: PropTypes.bool,
-  noDrag: PropTypes.bool,
-  noDragEventsBubbling: PropTypes.bool,
-  noKeyboard: PropTypes.bool,
-  onDrop: PropTypes.func,
-  onDropAccepted: PropTypes.func,
-  onDropRejected: PropTypes.func,
-  onFileDialogCancel: PropTypes.func,
-  onRemove: PropTypes.func,
-  onRemoveAll: PropTypes.func,
-  onUpload: PropTypes.func,
-  preventDropOnDocument: PropTypes.bool,
-};
 
-FileDropzone.defaultProps = {
-  files: [],
-};
-
-export default FileDropzone;
+export default Dropzone;

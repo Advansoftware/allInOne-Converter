@@ -1,4 +1,3 @@
-import Button from '@mui/material/Button';
 import * as Mui from '@mui/material/styles';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -6,13 +5,11 @@ import DialogContent from '@mui/material/DialogContent';
 import IconButton from '@mui/material/IconButton';
 import CloseIcon from '@mui/icons-material/Close';
 import Typography from '@mui/material/Typography';
-import ModalImage from '../assets/modalImage.svg';
-import { Box, Divider, Grid, TextField } from '@mui/material';
-import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
-import styled from 'styled-components';
+import { Divider, Grid } from '@mui/material';
+
 import CloudSyncOutlinedIcon from '@mui/icons-material/CloudSyncOutlined';
-import { useCallback, useRef, useState } from 'react';
-import Dropzone from './Dropzone';
+import { useEffect, useState } from 'react';
+import UploadPage from './UploadPage';
 
 const BootstrapDialog = Mui.styled(Dialog)(({ theme }) => ({
   '& .MuiDialogContent-root': {
@@ -21,20 +18,8 @@ const BootstrapDialog = Mui.styled(Dialog)(({ theme }) => ({
   '& .MuiDialog-container': {
     backdropFilter: 'blur(3px)',
   },
-  
 }));
-const InputDialog = Mui.styled(TextField)(({ theme }) => ({
-  '& .MuiFilledInput-root': {
-    borderRadius: '0px'
-  },
-  '& .MuiFilledInput-root:before': {
-    borderBottom: "1px solid #FD2C2C"
-  }
-  
-}));
-const Logo = styled.img`
-  width: 12rem;
-`
+
 export interface DialogTitleProps {
   id: string;
   children?: React.ReactNode;
@@ -70,17 +55,20 @@ export default function DialogUpload({open, setOpen}) {
   const [openFile, setOpenFile] = useState(false);
   const [video, setVideo] = useState([]);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const handleSubmitEnter = (e) =>{
-    if(e.key==='Enter'&&url!==''){
-      console.log(url)
-    }
-  }
-  const handleSubmit = (e)=>{
-    console.log(url);
-  }
+  const [starter, setStarter] = useState(false);
+  const [page, setPage] = useState(0);
+  
   const handleClose = () => {
     setOpen(false);
   };
+
+
+useEffect(()=>{
+  if(starter){
+    setPage(1);
+  }
+  console.log('page: ',page)
+},[starter]);
 
   return (
     <div>
@@ -94,58 +82,17 @@ export default function DialogUpload({open, setOpen}) {
           Enviar Video
         </BootstrapDialogTitle>
         <DialogContent dividers>
-          <Grid container justifyContent='center' spacing={2} alignSelf='center'>
-          {/* <Dropzone 
-            accept="image/*"
-            disabled={!!files.length ? true : false}
-            files={files}
-            imageS3={img}
-            onDrop={handleDrop}
-            onRemove={handleRemove}
-          > */}
-            <>
-            <Grid item xs={12} sx={{textAlign: 'center'}}>
-              <Logo src={ModalImage} alt="Modal Image"/>
-            </Grid>
-            <Grid item>
-              
-            <Typography variant='h5' sx={{textAlign: 'center'}} m={1}>
-              Arraste e solte os arquivos de vídeo para fazer o envio
-            </Typography>
-            </Grid>
-            <Grid item xs={12} textAlign='center'>
-            <Button autoFocus onClick={()=>setOpenFile(true)} variant="contained" color="error">
-              Selecionar Arquivos
-            </Button>
-            </Grid>
-            </>
-            {/* </Dropzone> */}
-            <Grid item xs={12} textAlign='center'>
-            <Typography variant='h6' sx={{textAlign: 'center'}} >
-              Ou
-            </Typography>
-            </Grid>
-            <Grid item xs={12} md={6} textAlign='center'>
-            <Box sx={{ display: 'flex', alignItems: 'flex-end' }}> 
-            <InputDialog 
-               fullWidth label="Digite a url" variant="filled"
-               color='error'
-               sx={{borderBottom: "1px solid #FD2C2C"}}
-               onChange={(e)=>setUrl(e.target.value)}
-               onKeyDown={handleSubmitEnter}
+         {page === 0 &&(
+            <UploadPage 
+              setStarter={setStarter} 
+              setVideo={setVideo} 
+              video={video} 
+              starter={starter} 
+              setUrl={setUrl} 
+              url={url}
             />
-            <CloudDownloadIcon 
-              onClick={handleSubmit}
-              sx={{
-                padding: '1.05rem 1rem',
-                backgroundColor: '#FD2C2C', 
-                cursor: 'pointer'
-              }}
-            />
-          </Box>
-            </Grid>
-          </Grid>
-          {uploadProgress>0&&(<>
+          )}
+          {starter && (<>
             <Divider sx={{marginY: 2}}/>
             <Grid container spacing={2}>
             <Grid item>
