@@ -1,15 +1,21 @@
-import { Box } from "@mui/material";
+
 import { Container } from "@mui/system"
-import { useState } from "react";
-import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
+import axios from "axios";
+import { useEffect, useState } from "react";
 import ConverterPageButton from "./components/ConverterPageButton";
 import DialogUpload from "./components/DialogUpload"
 import Navbar from "./components/Navbar"
-import ProgressStatus from "./components/ProgressStatus";
 
 function App() {
   const [open, setOpen] = useState(false);
 
+  const test = async() =>{
+    let data = await axios.get('http://localhost:8080/api/teste/');
+    console.log(data);
+  } 
+  useEffect(()=>{
+    test();
+  },[])
   return (
     <>
       <Navbar setOpenModal={()=>setOpen(true)}/>

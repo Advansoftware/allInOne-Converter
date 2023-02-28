@@ -60,7 +60,7 @@ RUN chown -R allone-converter.wheel /var/www /run /var/lib/nginx /var/log/nginx
 USER allone-converter
 
 # Especifica o diretório padrão do conteiner
-WORKDIR /var/www/html/v2/api
+WORKDIR /var/www/html/api
 
 # Supervisord inicia o nginx & php-fpm
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
