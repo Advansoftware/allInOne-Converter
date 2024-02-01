@@ -1,0 +1,54 @@
+version: '3'
+
+services:
+  server-node:
+    container_name: web-server-node-allone-converter
+    build: infra/web-server/node
+    entrypoint: "/usr/local/bin/node-entrypoint.sh"
+    tty: true
+    volumes:
+      - ./Project/web:/app
+    working_dir: /app
+    ports:
+      - '9001:5173'
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    networks:
+      allone-converter:
+        ipv4_address: 172.21.0.2
+
+  server-api:
+    container_name: web-server-api-allone-converter
+    build: infra/web-server/nginx
+    ports:
+      - "8080:8080"
+    env_file:
+      - infra/web-server/nginx/.env-api
+    volumes:
+      - ./Project:/var/www/html
+    networks:
+      allone-converter:
+        ipv4_address: 172.21.0.3
+
+  server-data-base:
+    container_name: data-base-allone-converter
+    build: infra/data-base/mysql-5.7.22
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./Project/.docker/dbdata:/var/lib/mysql
+    environment:
+     MYSQL_ROOT_PASSWORD: allone-converter
+     MYSQL_DATABASE: allone-converter
+     MYSQL_USER: allone-converter
+     MYSQL_PASSWORD: allone-converter
+    networks:
+      allone-converter:
+        ipv4_address: 172.21.0.4
+
+networks:
+  allone-converter:
+    ipam:
+      driver: default
+      config:
+      - subnet: 172.21.0.4/24
