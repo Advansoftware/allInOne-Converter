@@ -13,7 +13,7 @@ const InputDialog = Mui.styled(TextField)(({ theme }) => ({
   
 }));
 
-const UploadPage = ({setStarter, setVideo, video, starter, setUrl, url}) =>{
+const UploadPage = ({setStarter, setVideo, video, starter, setUrl, url}: any) =>{
   const handleSubmitEnter = (e) =>{
     if(e.key==='Enter'&&url!==''){
       console.log(url)

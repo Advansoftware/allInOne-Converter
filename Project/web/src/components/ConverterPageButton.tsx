@@ -5,10 +5,14 @@ import { CardActionArea, Container, Grid } from '@mui/material';
 import styled from 'styled-components';
 import Image from '../assets/btnImage.svg';
 
+interface ConverterPageButtonProps {
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
 const BtnImage = styled.img`
   width: 12rem;
 `
-const ConverterPageButton = ({setOpen})=>{
+const ConverterPageButton = ({setOpen}:ConverterPageButtonProps)=>{
   return(
     <Container sx={{display: 'flex', justifyContent: 'center', height: '70vh', alignItems: 'center'}}>
       <Card sx={{ 
