@@ -1,6 +1,10 @@
 import VideoCallIcon from '@mui/icons-material/VideoCall';
 import Button from '@mui/material/Button';
-const ButtonConverter =  ({children, onClick}) =>{
+interface ButtonConverterProps {
+  children: React.ReactNode;
+  onClick: React.MouseEventHandler<HTMLButtonElement>;
+}
+const ButtonConverter =  ({children, onClick}: ButtonConverterProps) =>{
   return(
     <Button onClick={onClick} sx={{
       backgroundColor: 'transparent',
