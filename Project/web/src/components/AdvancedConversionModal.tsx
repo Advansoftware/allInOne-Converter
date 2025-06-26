@@ -648,7 +648,7 @@ const AdvancedConversionModal: React.FC<AdvancedConversionModalProps> = ({
             })
           }
         >
-          Converter
+          Iniciar
         </Button>
       </DialogActions>
     </Dialog>
