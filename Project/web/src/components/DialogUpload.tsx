@@ -10,6 +10,9 @@ import { Divider, Grid } from "@mui/material";
 import CloudSyncOutlinedIcon from "@mui/icons-material/CloudSyncOutlined";
 import { useEffect, useState } from "react";
 import UploadPage from "./UploadPage";
+import ConversionModal from "./ConversionModal";
+import AdvancedConversionModal from "./AdvancedConversionModal";
+import conversionProfiles from "../conversionProfiles.json";
 
 const BootstrapDialog = Mui.styled(Dialog)(({ theme }) => ({
   "& .MuiDialogContent-root": {
@@ -86,24 +89,30 @@ export default function DialogUpload({
   const [url, setUrl] = useState("");
   const [openFile, setOpenFile] = useState(false);
   const [video, setVideo] = useState<File[]>([]);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [starter, setStarter] = useState(false);
-  const [page, setPage] = useState(0);
+  const [showConversion, setShowConversion] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [selectedProfile, setSelectedProfile] = useState<any>(null);
 
   const handleClose = () => {
     setOpen(false);
+    setShowConversion(false);
+    setShowAdvanced(false);
+    setVideo([]);
+    setStarter(false);
+    setSelectedProfile(null);
   };
 
+  // Ao selecionar arquivo, abre o modal de conversão
   useEffect(() => {
-    if (starter) {
-      setPage(1);
+    if (video.length > 0 && !showAdvanced) {
+      setShowAdvanced(true);
     }
-    console.log("page: ", page);
-  }, [starter]);
+  }, [video]);
 
-  // Quando o vídeo for selecionado, adiciona à fila e fecha o modal
-  useEffect(() => {
-    if (starter && video.length > 0) {
+  // Ao confirmar conversão, adiciona à fila
+  const handleAdvancedConvert = (options: any) => {
+    if (video.length > 0) {
       const file = video[0];
       const thumbnail =
         file.type.startsWith("image/") || file.type.startsWith("video/")
@@ -111,11 +120,11 @@ export default function DialogUpload({
           : "/src/assets/modalImage.svg";
       addUpload({ name: file.name, thumbnail });
       setOpen(false);
-      setStarter(false);
+      setShowAdvanced(false);
       setVideo([]);
-      setPage(0);
+      setStarter(false);
     }
-  }, [starter]);
+  };
 
   return (
     <div>
@@ -127,33 +136,24 @@ export default function DialogUpload({
           Enviar Video
         </BootstrapDialogTitle>
         <DialogContent dividers>
-          {page === 0 && (
-            <UploadPage
-              setStarter={setStarter}
-              setVideo={setVideo}
-              video={video}
-              starter={starter}
-              setUrl={setUrl}
-              url={url}
-            />
-          )}
-          {starter && (
-            <>
-              <Divider sx={{ marginY: 2 }} />
-              <Grid container spacing={2}>
-                <Grid item>
-                  <CloudSyncOutlinedIcon htmlColor="#7184fb" />
-                </Grid>
-                <Grid item>
-                  <Typography variant="caption" color="textSecondary">
-                    Enviando: {uploadProgress}%
-                  </Typography>
-                </Grid>
-              </Grid>
-            </>
-          )}
+          <UploadPage
+            setStarter={setStarter}
+            setVideo={setVideo}
+            video={video}
+            starter={starter}
+            setUrl={setUrl}
+            url={url}
+          />
         </DialogContent>
       </BootstrapDialog>
+      <AdvancedConversionModal
+        open={showAdvanced}
+        onClose={() => {
+          setShowAdvanced(false);
+          setVideo([]);
+        }}
+        onConvert={handleAdvancedConvert}
+      />
     </div>
   );
 }

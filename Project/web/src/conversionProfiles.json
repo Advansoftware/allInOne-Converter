@@ -1,0 +1,26 @@
+[
+  {
+    "id": "youtube_hd",
+    "name": "YouTube HD (MP4)",
+    "description": "Vídeo em 1080p, codec H.264, áudio AAC.",
+    "ffmpeg": "-c:v libx264 -preset fast -crf 23 -c:a aac -b:a 192k -vf scale=1920:1080"
+  },
+  {
+    "id": "instagram_story",
+    "name": "Instagram Story (MP4)",
+    "description": "Vídeo vertical 1080x1920, codec H.264, áudio AAC.",
+    "ffmpeg": "-c:v libx264 -preset fast -crf 25 -c:a aac -b:a 128k -vf scale=1080:1920"
+  },
+  {
+    "id": "audio_mp3",
+    "name": "Áudio MP3",
+    "description": "Extrai apenas o áudio em MP3, 192kbps.",
+    "ffmpeg": "-vn -ar 44100 -ac 2 -b:a 192k -f mp3"
+  },
+  {
+    "id": "gif",
+    "name": "GIF Animado",
+    "description": "Converte para GIF animado, 480px de largura.",
+    "ffmpeg": "-vf scale=480:-1 -r 10 -f gif"
+  }
+]
