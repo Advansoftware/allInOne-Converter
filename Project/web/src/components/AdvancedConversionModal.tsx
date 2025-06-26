@@ -186,430 +186,576 @@ const AdvancedConversionModal: React.FC<AdvancedConversionModalProps> = ({
       onClose={onClose}
       fullScreen
       PaperProps={{
-        sx: { background: "#23242b", borderRadius: 0, p: 0 },
+        sx: {
+          background: "#181A20",
+          borderRadius: 0,
+          p: 0,
+          boxShadow: "0 4px 32px 0 rgba(0,0,0,0.18)",
+          border: "none",
+          fontFamily: "Inter, Segoe UI, Arial",
+        },
       }}
     >
       <Box
         sx={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
+          justifyContent: "flex-start",
           p: 3,
-          borderBottom: "1px solid #333",
-          background: "#181A20",
+          borderBottom: "1px solid #23242b",
+          background: "#23242b",
         }}
       >
-        <Typography variant="h5" sx={{ color: "#FF0000", fontWeight: 800 }}>
-          Conversor Avançado
-        </Typography>
-        <IconButton onClick={onClose} sx={{ color: "#FF0000" }}>
-          <CloseIcon />
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Box
+            sx={{
+              width: 32,
+              height: 32,
+              borderRadius: "50%",
+              background: "#FF0000",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              mr: 2,
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 32 32" fill="none">
+              <circle cx="16" cy="16" r="16" fill="#FF0000" />
+              <path
+                d="M16 8v8l6 3"
+                stroke="#fff"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </Box>
+          <Typography
+            variant="h6"
+            sx={{
+              color: "#fff",
+              fontWeight: 600,
+              letterSpacing: 0.5,
+              fontSize: 22,
+              fontFamily: "Inter, Segoe UI, Arial",
+            }}
+          >
+            Conversor Avançado
+          </Typography>
+        </Box>
+        <Box sx={{ flex: 1 }} />
+        <IconButton
+          onClick={onClose}
+          sx={{ color: "#aaa", "&:hover": { color: "#FF0000" } }}
+        >
+          <CloseIcon fontSize="medium" />
         </IconButton>
       </Box>
-      <DialogContent sx={{ p: { xs: 2, md: 4 } }}>
-        <Grid container spacing={3}>
+      <DialogContent
+        sx={{
+          p: { xs: 2, md: 4 },
+          background: "#181A20",
+          minHeight: 400,
+        }}
+      >
+        <Grid container spacing={4}>
           <Grid item xs={12} md={4}>
-            <Typography sx={{ color: "#fff", mb: 2, fontWeight: 700 }}>
-              Perfis Rápidos
-            </Typography>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              {conversionProfiles.map((profile: Profile) => (
-                <Paper
-                  key={profile.id}
-                  elevation={selectedProfile === profile.id ? 8 : 1}
-                  sx={{
-                    p: 2,
-                    borderRadius: 2,
-                    background:
-                      selectedProfile === profile.id ? "#181A20" : "#23242b",
-                    border:
-                      selectedProfile === profile.id
-                        ? "2px solid #FF0000"
-                        : "1px solid #333",
-                    cursor: "pointer",
-                    transition: "all 0.18s",
-                    "&:hover": {
-                      border: "2px solid #FF0000",
-                      background: "#181A20",
-                    },
-                  }}
-                  onClick={() => handleProfileSelect(profile)}
-                >
-                  <Typography sx={{ color: "#FF0000", fontWeight: 700 }}>
-                    {profile.name}
-                  </Typography>
-                  <Typography
-                    sx={{ color: "#fff", opacity: 0.8, fontSize: 15 }}
+            <Paper
+              elevation={1}
+              sx={{
+                p: 2.5,
+                borderRadius: 3,
+                background: "#23242b",
+                boxShadow: "0 2px 8px 0 rgba(0,0,0,0.10)",
+                border: "1px solid #232b3b",
+                mb: 2,
+                fontFamily: "Inter, Segoe UI, Arial",
+              }}
+            >
+              <Typography
+                sx={{
+                  color: "#FF0000",
+                  mb: 2,
+                  fontWeight: 700,
+                  letterSpacing: 0.5,
+                  fontSize: 16,
+                  fontFamily: "Inter, Segoe UI, Arial",
+                }}
+              >
+                Perfis Rápidos
+              </Typography>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                {conversionProfiles.map((profile: Profile) => (
+                  <Paper
+                    key={profile.id}
+                    elevation={selectedProfile === profile.id ? 3 : 0}
+                    sx={{
+                      p: 1.5,
+                      borderRadius: 2,
+                      background:
+                        selectedProfile === profile.id ? "#20222a" : "#23242b",
+                      border:
+                        selectedProfile === profile.id
+                          ? "2px solid #FF0000"
+                          : "1px solid #232b3b",
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                      boxShadow:
+                        selectedProfile === profile.id
+                          ? "0 2px 8px 0 rgba(255,0,0,0.10)"
+                          : undefined,
+                      "&:hover": {
+                        border: "2px solid #FF0000",
+                        background: "#20222a",
+                        boxShadow: "0 2px 8px 0 rgba(255,0,0,0.08)",
+                      },
+                    }}
+                    onClick={() => handleProfileSelect(profile)}
                   >
-                    {profile.description}
-                  </Typography>
-                </Paper>
-              ))}
-            </Box>
+                    <Typography
+                      sx={{
+                        color:
+                          selectedProfile === profile.id ? "#FF0000" : "#fff",
+                        fontWeight: 600,
+                        fontSize: 15,
+                        fontFamily: "Inter, Segoe UI, Arial",
+                      }}
+                    >
+                      {profile.name}
+                    </Typography>
+                    <Typography
+                      sx={{
+                        color: "#aaa",
+                        opacity: 0.9,
+                        fontSize: 13,
+                        fontFamily: "Inter, Segoe UI, Arial",
+                      }}
+                    >
+                      {profile.description}
+                    </Typography>
+                  </Paper>
+                ))}
+              </Box>
+            </Paper>
           </Grid>
           <Grid item xs={12} md={8}>
-            <Typography sx={{ color: "#fff", mb: 2, fontWeight: 700 }}>
-              Configuração Avançada
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel sx={{ color: "#FF0000" }}>Formato</InputLabel>
-                  <Select
-                    value={format}
-                    label="Formato"
-                    onChange={(e) => setFormat(e.target.value)}
-                    sx={{
-                      color: "#fff",
-                      ".MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#FF0000",
-                      },
-                    }}
-                  >
-                    {videoFormats.map((f) => (
-                      <MenuItem key={f} value={f}>
-                        {f.toUpperCase()}
-                      </MenuItem>
-                    ))}
-                    {audioFormats.map((f) => (
-                      <MenuItem key={f} value={f}>
-                        {f.toUpperCase()}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel sx={{ color: "#FF0000" }}>Codec</InputLabel>
-                  <Select
-                    value={codec}
-                    label="Codec"
-                    onChange={(e) => setCodec(e.target.value)}
-                    sx={{
-                      color: "#fff",
-                      ".MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#FF0000",
-                      },
-                    }}
-                  >
-                    {codecs.map((c) => (
-                      <MenuItem key={c} value={c}>
-                        {c}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel sx={{ color: "#FF0000" }}>Resolução</InputLabel>
-                  <Select
-                    value={resolution}
-                    label="Resolução"
-                    onChange={(e) => setResolution(e.target.value)}
-                    sx={{
-                      color: "#fff",
-                      ".MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#FF0000",
-                      },
-                    }}
-                  >
-                    {resolutions.map((r) => (
-                      <MenuItem key={r.value} value={r.value}>
-                        {r.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Tooltip title="Taxa de bits do vídeo (kbps)">
-                  <TextField
-                    label="Bitrate (kbps)"
-                    type="number"
-                    value={bitrate}
-                    onChange={(e) => setBitrate(Number(e.target.value))}
-                    fullWidth
-                    inputProps={{ min: 100, max: 10000, step: 100 }}
-                    placeholder="Ex: 2000"
-                    sx={{
-                      input: { color: "#fff" },
-                      label: { color: "#FF0000" },
-                      ".MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#FF0000",
-                      },
-                    }}
-                  />
-                </Tooltip>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Tooltip title="Taxa de bits do áudio (kbps)">
-                  <TextField
-                    label="Áudio Bitrate (kbps)"
-                    type="number"
-                    value={audioBitrate}
-                    onChange={(e) => setAudioBitrate(Number(e.target.value))}
-                    fullWidth
-                    inputProps={{ min: 32, max: 320, step: 8 }}
-                    placeholder="Ex: 192"
-                    sx={{
-                      input: { color: "#fff" },
-                      label: { color: "#FF0000" },
-                      ".MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#FF0000",
-                      },
-                    }}
-                  />
-                </Tooltip>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Tooltip title="Frames por segundo">
-                  <Box>
-                    <Slider
-                      value={fps}
-                      min={1}
-                      max={60}
-                      step={1}
-                      onChange={(_, v) => setFps(Number(v))}
-                      valueLabelDisplay="auto"
-                      sx={{ color: "#FF0000" }}
+            <Paper
+              elevation={1}
+              sx={{
+                p: 2.5,
+                borderRadius: 3,
+                background: "#23242b",
+                boxShadow: "0 2px 8px 0 rgba(0,0,0,0.10)",
+                border: "1px solid #232b3b",
+                fontFamily: "Inter, Segoe UI, Arial",
+              }}
+            >
+              <Typography
+                sx={{
+                  color: "#FF0000",
+                  mb: 2,
+                  fontWeight: 700,
+                  letterSpacing: 0.5,
+                  fontSize: 16,
+                  fontFamily: "Inter, Segoe UI, Arial",
+                }}
+              >
+                Configuração Avançada
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth>
+                    <InputLabel sx={{ color: "#FF0000" }}>Formato</InputLabel>
+                    <Select
+                      value={format}
+                      label="Formato"
+                      onChange={(e) => setFormat(e.target.value)}
+                      sx={{
+                        color: "#fff",
+                        ".MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#FF0000",
+                        },
+                      }}
+                    >
+                      {videoFormats.map((f) => (
+                        <MenuItem key={f} value={f}>
+                          {f.toUpperCase()}
+                        </MenuItem>
+                      ))}
+                      {audioFormats.map((f) => (
+                        <MenuItem key={f} value={f}>
+                          {f.toUpperCase()}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth>
+                    <InputLabel sx={{ color: "#FF0000" }}>Codec</InputLabel>
+                    <Select
+                      value={codec}
+                      label="Codec"
+                      onChange={(e) => setCodec(e.target.value)}
+                      sx={{
+                        color: "#fff",
+                        ".MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#FF0000",
+                        },
+                      }}
+                    >
+                      {codecs.map((c) => (
+                        <MenuItem key={c} value={c}>
+                          {c}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth>
+                    <InputLabel sx={{ color: "#FF0000" }}>Resolução</InputLabel>
+                    <Select
+                      value={resolution}
+                      label="Resolução"
+                      onChange={(e) => setResolution(e.target.value)}
+                      sx={{
+                        color: "#fff",
+                        ".MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#FF0000",
+                        },
+                      }}
+                    >
+                      {resolutions.map((r) => (
+                        <MenuItem key={r.value} value={r.value}>
+                          {r.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Tooltip title="Taxa de bits do vídeo (kbps)">
+                    <TextField
+                      label="Bitrate (kbps)"
+                      type="number"
+                      value={bitrate}
+                      onChange={(e) => setBitrate(Number(e.target.value))}
+                      fullWidth
+                      inputProps={{ min: 100, max: 10000, step: 100 }}
+                      placeholder="Ex: 2000"
+                      sx={{
+                        input: { color: "#fff" },
+                        label: { color: "#FF0000" },
+                        ".MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#FF0000",
+                        },
+                      }}
                     />
-                    <Typography sx={{ color: "#fff", fontSize: 13 }}>
-                      FPS: {fps}
-                    </Typography>
-                  </Box>
-                </Tooltip>
+                  </Tooltip>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Tooltip title="Taxa de bits do áudio (kbps)">
+                    <TextField
+                      label="Áudio Bitrate (kbps)"
+                      type="number"
+                      value={audioBitrate}
+                      onChange={(e) => setAudioBitrate(Number(e.target.value))}
+                      fullWidth
+                      inputProps={{ min: 32, max: 320, step: 8 }}
+                      placeholder="Ex: 192"
+                      sx={{
+                        input: { color: "#fff" },
+                        label: { color: "#FF0000" },
+                        ".MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#FF0000",
+                        },
+                      }}
+                    />
+                  </Tooltip>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Tooltip title="Frames por segundo">
+                    <Box>
+                      <Slider
+                        value={fps}
+                        min={1}
+                        max={60}
+                        step={1}
+                        onChange={(_, v) => setFps(Number(v))}
+                        valueLabelDisplay="auto"
+                        sx={{ color: "#FF0000" }}
+                      />
+                      <Typography sx={{ color: "#fff", fontSize: 13 }}>
+                        FPS: {fps}
+                      </Typography>
+                    </Box>
+                  </Tooltip>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Tooltip title="Qualidade CRF (para x264/x265). 18=alta, 23=padrão, 28=baixa qualidade">
+                    <TextField
+                      label="CRF (Qualidade)"
+                      type="number"
+                      value={crf}
+                      onChange={(e) => setCrf(Number(e.target.value))}
+                      fullWidth
+                      inputProps={{ min: 0, max: 51, step: 1 }}
+                      placeholder="Ex: 23 (padrão)"
+                      sx={{
+                        input: { color: "#fff" },
+                        label: { color: "#FF0000" },
+                        ".MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#FF0000",
+                        },
+                      }}
+                    />
+                  </Tooltip>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth>
+                    <InputLabel sx={{ color: "#FF0000" }}>
+                      Preset (Velocidade)
+                    </InputLabel>
+                    <Select
+                      value={preset}
+                      label="Preset (Velocidade)"
+                      onChange={(e) => setPreset(e.target.value)}
+                      sx={{
+                        color: "#fff",
+                        ".MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#FF0000",
+                        },
+                      }}
+                    >
+                      {presets.map((p) => (
+                        <MenuItem key={p} value={p}>
+                          {p} {p === "medium" && "(padrão)"}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Tooltip title="Proporção (ex: 16:9, 4:3, 1:1)">
+                    <TextField
+                      label="Proporção (Aspect Ratio)"
+                      value={aspectRatio}
+                      onChange={(e) => setAspectRatio(e.target.value)}
+                      fullWidth
+                      placeholder="Ex: 16:9"
+                      sx={{
+                        input: { color: "#fff" },
+                        label: { color: "#FF0000" },
+                        ".MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#FF0000",
+                        },
+                      }}
+                    />
+                  </Tooltip>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Tooltip title="Corte inicial (segundos ou hh:mm:ss). Ex: 00:00:10">
+                    <TextField
+                      label="Corte Início"
+                      value={trimStart}
+                      onChange={(e) => setTrimStart(e.target.value)}
+                      fullWidth
+                      placeholder="Ex: 00:00:10"
+                      sx={{
+                        input: { color: "#fff" },
+                        label: { color: "#FF0000" },
+                        ".MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#FF0000",
+                        },
+                      }}
+                    />
+                  </Tooltip>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Tooltip title="Corte final (segundos ou hh:mm:ss). Ex: 00:01:00">
+                    <TextField
+                      label="Corte Fim"
+                      value={trimEnd}
+                      onChange={(e) => setTrimEnd(e.target.value)}
+                      fullWidth
+                      placeholder="Ex: 00:01:00"
+                      sx={{
+                        input: { color: "#fff" },
+                        label: { color: "#FF0000" },
+                        ".MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#FF0000",
+                        },
+                      }}
+                    />
+                  </Tooltip>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth>
+                    <InputLabel sx={{ color: "#FF0000" }}>
+                      Codec de Áudio
+                    </InputLabel>
+                    <Select
+                      value={audioCodec}
+                      label="Codec de Áudio"
+                      onChange={(e) => setAudioCodec(e.target.value)}
+                      sx={{
+                        color: "#fff",
+                        ".MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#FF0000",
+                        },
+                      }}
+                    >
+                      {audioCodecs.map((c) => (
+                        <MenuItem key={c} value={c}>
+                          {c} {c === "aac" && "(padrão)"}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <FormControl fullWidth>
+                    <InputLabel sx={{ color: "#FF0000" }}>
+                      Sample Rate
+                    </InputLabel>
+                    <Select
+                      value={sampleRate}
+                      label="Sample Rate"
+                      onChange={(e) => setSampleRate(Number(e.target.value))}
+                      sx={{
+                        color: "#fff",
+                        ".MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#FF0000",
+                        },
+                      }}
+                    >
+                      {sampleRates.map((r) => (
+                        <MenuItem key={r} value={r}>
+                          {r} Hz {r === 44100 && "(padrão)"}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <FormControl fullWidth>
+                    <InputLabel sx={{ color: "#FF0000" }}>Canais</InputLabel>
+                    <Select
+                      value={channels}
+                      label="Canais"
+                      onChange={(e) => setChannels(Number(e.target.value))}
+                      sx={{
+                        color: "#fff",
+                        ".MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#FF0000",
+                        },
+                      }}
+                    >
+                      {channelOptions.map((c) => (
+                        <MenuItem key={c.value} value={c.value}>
+                          {c.label} {c.value === 2 && "(padrão)"}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Tooltip title="Volume do áudio (%) - 100 = normal, 200 = dobro, 50 = metade">
+                    <TextField
+                      label="Volume (%)"
+                      type="number"
+                      value={volume}
+                      onChange={(e) => setVolume(Number(e.target.value))}
+                      fullWidth
+                      inputProps={{ min: 0, max: 500, step: 1 }}
+                      placeholder="Ex: 100 (normal)"
+                      sx={{
+                        input: { color: "#fff" },
+                        label: { color: "#FF0000" },
+                        ".MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#FF0000",
+                        },
+                      }}
+                    />
+                  </Tooltip>
+                </Grid>
+                <Grid item xs={12}>
+                  <Tooltip title="Nome do arquivo de saída (opcional, ex: video_convertido.mp4)">
+                    <TextField
+                      label="Nome do Arquivo de Saída"
+                      value={outputName}
+                      onChange={(e) => setOutputName(e.target.value)}
+                      fullWidth
+                      placeholder="Ex: video_convertido.mp4"
+                      sx={{
+                        input: { color: "#fff" },
+                        label: { color: "#FF0000" },
+                        ".MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#FF0000",
+                        },
+                      }}
+                    />
+                  </Tooltip>
+                </Grid>
+                <Grid item xs={12}>
+                  <Tooltip title="Argumentos customizados do ffmpeg (avançado)">
+                    <TextField
+                      label="Custom Args"
+                      value={customArgs}
+                      onChange={(e) => setCustomArgs(e.target.value)}
+                      fullWidth
+                      multiline
+                      minRows={2}
+                      sx={{
+                        input: { color: "#fff" },
+                        label: { color: "#FF0000" },
+                        ".MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#FF0000",
+                        },
+                      }}
+                    />
+                  </Tooltip>
+                </Grid>
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <Tooltip title="Qualidade CRF (para x264/x265). 18=alta, 23=padrão, 28=baixa qualidade">
-                  <TextField
-                    label="CRF (Qualidade)"
-                    type="number"
-                    value={crf}
-                    onChange={(e) => setCrf(Number(e.target.value))}
-                    fullWidth
-                    inputProps={{ min: 0, max: 51, step: 1 }}
-                    placeholder="Ex: 23 (padrão)"
-                    sx={{
-                      input: { color: "#fff" },
-                      label: { color: "#FF0000" },
-                      ".MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#FF0000",
-                      },
-                    }}
-                  />
-                </Tooltip>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel sx={{ color: "#FF0000" }}>
-                    Preset (Velocidade)
-                  </InputLabel>
-                  <Select
-                    value={preset}
-                    label="Preset (Velocidade)"
-                    onChange={(e) => setPreset(e.target.value)}
-                    sx={{
-                      color: "#fff",
-                      ".MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#FF0000",
-                      },
-                    }}
-                  >
-                    {presets.map((p) => (
-                      <MenuItem key={p} value={p}>
-                        {p} {p === "medium" && "(padrão)"}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Tooltip title="Proporção (ex: 16:9, 4:3, 1:1)">
-                  <TextField
-                    label="Proporção (Aspect Ratio)"
-                    value={aspectRatio}
-                    onChange={(e) => setAspectRatio(e.target.value)}
-                    fullWidth
-                    placeholder="Ex: 16:9"
-                    sx={{
-                      input: { color: "#fff" },
-                      label: { color: "#FF0000" },
-                      ".MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#FF0000",
-                      },
-                    }}
-                  />
-                </Tooltip>
-              </Grid>
-              <Grid item xs={6} sm={3}>
-                <Tooltip title="Corte inicial (segundos ou hh:mm:ss). Ex: 00:00:10">
-                  <TextField
-                    label="Corte Início"
-                    value={trimStart}
-                    onChange={(e) => setTrimStart(e.target.value)}
-                    fullWidth
-                    placeholder="Ex: 00:00:10"
-                    sx={{
-                      input: { color: "#fff" },
-                      label: { color: "#FF0000" },
-                      ".MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#FF0000",
-                      },
-                    }}
-                  />
-                </Tooltip>
-              </Grid>
-              <Grid item xs={6} sm={3}>
-                <Tooltip title="Corte final (segundos ou hh:mm:ss). Ex: 00:01:00">
-                  <TextField
-                    label="Corte Fim"
-                    value={trimEnd}
-                    onChange={(e) => setTrimEnd(e.target.value)}
-                    fullWidth
-                    placeholder="Ex: 00:01:00"
-                    sx={{
-                      input: { color: "#fff" },
-                      label: { color: "#FF0000" },
-                      ".MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#FF0000",
-                      },
-                    }}
-                  />
-                </Tooltip>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel sx={{ color: "#FF0000" }}>
-                    Codec de Áudio
-                  </InputLabel>
-                  <Select
-                    value={audioCodec}
-                    label="Codec de Áudio"
-                    onChange={(e) => setAudioCodec(e.target.value)}
-                    sx={{
-                      color: "#fff",
-                      ".MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#FF0000",
-                      },
-                    }}
-                  >
-                    {audioCodecs.map((c) => (
-                      <MenuItem key={c} value={c}>
-                        {c} {c === "aac" && "(padrão)"}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={6} sm={3}>
-                <FormControl fullWidth>
-                  <InputLabel sx={{ color: "#FF0000" }}>Sample Rate</InputLabel>
-                  <Select
-                    value={sampleRate}
-                    label="Sample Rate"
-                    onChange={(e) => setSampleRate(Number(e.target.value))}
-                    sx={{
-                      color: "#fff",
-                      ".MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#FF0000",
-                      },
-                    }}
-                  >
-                    {sampleRates.map((r) => (
-                      <MenuItem key={r} value={r}>
-                        {r} Hz {r === 44100 && "(padrão)"}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={6} sm={3}>
-                <FormControl fullWidth>
-                  <InputLabel sx={{ color: "#FF0000" }}>Canais</InputLabel>
-                  <Select
-                    value={channels}
-                    label="Canais"
-                    onChange={(e) => setChannels(Number(e.target.value))}
-                    sx={{
-                      color: "#fff",
-                      ".MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#FF0000",
-                      },
-                    }}
-                  >
-                    {channelOptions.map((c) => (
-                      <MenuItem key={c.value} value={c.value}>
-                        {c.label} {c.value === 2 && "(padrão)"}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Tooltip title="Volume do áudio (%) - 100 = normal, 200 = dobro, 50 = metade">
-                  <TextField
-                    label="Volume (%)"
-                    type="number"
-                    value={volume}
-                    onChange={(e) => setVolume(Number(e.target.value))}
-                    fullWidth
-                    inputProps={{ min: 0, max: 500, step: 1 }}
-                    placeholder="Ex: 100 (normal)"
-                    sx={{
-                      input: { color: "#fff" },
-                      label: { color: "#FF0000" },
-                      ".MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#FF0000",
-                      },
-                    }}
-                  />
-                </Tooltip>
-              </Grid>
-              <Grid item xs={12}>
-                <Tooltip title="Nome do arquivo de saída (opcional, ex: video_convertido.mp4)">
-                  <TextField
-                    label="Nome do Arquivo de Saída"
-                    value={outputName}
-                    onChange={(e) => setOutputName(e.target.value)}
-                    fullWidth
-                    placeholder="Ex: video_convertido.mp4"
-                    sx={{
-                      input: { color: "#fff" },
-                      label: { color: "#FF0000" },
-                      ".MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#FF0000",
-                      },
-                    }}
-                  />
-                </Tooltip>
-              </Grid>
-              <Grid item xs={12}>
-                <Tooltip title="Argumentos customizados do ffmpeg (avançado)">
-                  <TextField
-                    label="Custom Args"
-                    value={customArgs}
-                    onChange={(e) => setCustomArgs(e.target.value)}
-                    fullWidth
-                    multiline
-                    minRows={2}
-                    sx={{
-                      input: { color: "#fff" },
-                      label: { color: "#FF0000" },
-                      ".MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#FF0000",
-                      },
-                    }}
-                  />
-                </Tooltip>
-              </Grid>
-            </Grid>
+            </Paper>
           </Grid>
         </Grid>
       </DialogContent>
-      <DialogActions sx={{ justifyContent: "center", pb: 3 }}>
-        <Button onClick={onClose} sx={{ color: "#fff" }}>
+      <DialogActions
+        sx={{
+          justifyContent: "center",
+          pb: 3,
+          background: "#181A20",
+          gap: 2,
+        }}
+      >
+        <Button
+          onClick={onClose}
+          startIcon={<CloseIcon />}
+          sx={{
+            color: "#fff",
+            fontWeight: 600,
+            border: "1.5px solid #232b3b",
+            borderRadius: 2,
+            px: 4,
+            py: 1.1,
+            fontSize: 16,
+            background: "#23242b",
+            boxShadow: "none",
+            letterSpacing: 0.5,
+            fontFamily: "Inter, Segoe UI, Arial",
+            transition: "all 0.15s cubic-bezier(.4,2,.6,1)",
+            "&:hover": {
+              background: "#232b3b",
+              color: "#FF0000",
+              borderColor: "#FF0000",
+            },
+            "&:active": {
+              transform: "scale(0.98)",
+            },
+          }}
+        >
           Cancelar
         </Button>
         <Button
@@ -620,8 +766,20 @@ const AdvancedConversionModal: React.FC<AdvancedConversionModalProps> = ({
             color: "#fff",
             fontWeight: 700,
             borderRadius: 2,
-            px: 3,
-            "&:hover": { background: "#d90000" },
+            px: 4,
+            py: 1.1,
+            fontSize: 16,
+            boxShadow: "0 2px 8px 0 rgba(255,0,0,0.10)",
+            letterSpacing: 0.5,
+            fontFamily: "Inter, Segoe UI, Arial",
+            transition: "all 0.15s cubic-bezier(.4,2,.6,1)",
+            "&:hover": {
+              background: "#d90000",
+              boxShadow: "0 4px 16px 0 rgba(255,0,0,0.18)",
+            },
+            "&:active": {
+              transform: "scale(0.98)",
+            },
           }}
           onClick={() =>
             onConvert({
@@ -648,7 +806,7 @@ const AdvancedConversionModal: React.FC<AdvancedConversionModalProps> = ({
             })
           }
         >
-          Iniciar
+          Iniciar Conversão
         </Button>
       </DialogActions>
     </Dialog>
