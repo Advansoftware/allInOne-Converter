@@ -14,9 +14,18 @@ import UploadPage from "./UploadPage";
 const BootstrapDialog = Mui.styled(Dialog)(({ theme }) => ({
   "& .MuiDialogContent-root": {
     padding: theme.spacing(2),
+    background: "#181A20",
+    borderRadius: 16,
   },
   "& .MuiDialog-container": {
-    backdropFilter: "blur(3px)",
+    backdropFilter: "blur(5px)",
+    background: "rgba(24,26,32,0.7)",
+  },
+  "& .MuiPaper-root": {
+    borderRadius: 16,
+    boxShadow: "0 8px 48px 0 rgba(255,0,0,0.18)",
+    border: "2px solid #FF0000",
+    background: "#23242b",
   },
 }));
 
@@ -28,9 +37,18 @@ export interface DialogTitleProps {
 
 function BootstrapDialogTitle(props: DialogTitleProps) {
   const { children, onClose, ...other } = props;
-
   return (
-    <DialogTitle sx={{ m: 0, p: 2 }} {...other}>
+    <DialogTitle
+      sx={{
+        m: 0,
+        p: 2,
+        color: "#FF0000",
+        fontWeight: 700,
+        fontSize: 24,
+        letterSpacing: 1,
+      }}
+      {...other}
+    >
       {children}
       {onClose ? (
         <IconButton
@@ -40,7 +58,11 @@ function BootstrapDialogTitle(props: DialogTitleProps) {
             position: "absolute",
             right: 8,
             top: 8,
-            color: (theme) => theme.palette.grey[500],
+            color: "#FF0000",
+            background: "rgba(255,0,0,0.08)",
+            borderRadius: 2,
+            "&:hover": { background: "#FF0000", color: "#fff" },
+            transition: "background 0.18s, color 0.18s",
           }}
         >
           <CloseIcon />

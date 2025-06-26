@@ -1,8 +1,8 @@
-import { Box, Typography, Grid, Button } from "@mui/material";
+import { Box, Typography, Grid, Button, useTheme } from "@mui/material";
 import ProgressStatus from "./ProgressStatus";
 import DownloadIcon from "@mui/icons-material/Download";
 import CloudSyncOutlinedIcon from "@mui/icons-material/CloudSyncOutlined";
-import React, { useState } from "react";
+import React from "react";
 
 interface UploadItem {
   id: string;
@@ -26,103 +26,185 @@ const statusText = {
 };
 
 export default function UploadQueue({ uploads, onDownload }: UploadQueueProps) {
+  const theme = useTheme();
   return (
-    <Box sx={{ background: "#232323", borderRadius: 2, p: 3, mt: 4 }}>
-      <Typography variant="h6" sx={{ color: "#fff", mb: 2 }}>
-        FILA DE CONVERSÃO
+    <Box
+      sx={{
+        background: "#181A20",
+        borderRadius: 4,
+        p: { xs: 2, md: 4 },
+        mt: 4,
+        boxShadow: "0 4px 32px 0 rgba(0,0,0,0.18)",
+        minHeight: 320,
+        maxWidth: 900,
+        mx: "auto",
+      }}
+    >
+      <Typography
+        variant="h5"
+        sx={{
+          color: "#fff",
+          mb: 3,
+          fontWeight: 700,
+          letterSpacing: 1,
+          textAlign: "center",
+        }}
+      >
+        Fila de Conversão
       </Typography>
       {uploads.length === 0 && (
-        <Typography color="#aaa">Nenhum arquivo na fila.</Typography>
+        <Typography color="#aaa" sx={{ textAlign: "center", mt: 6 }}>
+          Nenhum arquivo na fila.
+        </Typography>
       )}
-
-      {uploads.map((item) => (
-        <Grid
-          container
-          alignItems="center"
-          spacing={2}
-          sx={{ mb: 2, background: "#181818", borderRadius: 2, p: 1 }}
-          key={item.id}
-        >
-          <Grid item md={3} sx={{ position: "relative" }}>
+      <Grid container spacing={2}>
+        {uploads.map((item) => (
+          <Grid item xs={12} key={item.id}>
             <Box
-              component="img"
-              src={item.thumbnail}
-              alt={item.name}
               sx={{
-                width: 270,
-                height: 153,
-                objectFit: "cover",
-                borderRadius: 1,
-                display: "block",
+                display: "flex",
+                alignItems: "center",
+                background: "#23242b",
+                borderRadius: 3,
+                boxShadow: "0 2px 8px 0 rgba(0,0,0,0.10)",
+                p: { xs: 2, md: 3 },
+                position: "relative",
+                minHeight: 100,
+                mb: 2,
+                gap: 2,
               }}
-            />
-            {item.status !== "pronto" && (
+            >
               <Box
+                component="img"
+                src={item.thumbnail}
+                alt={item.name}
                 sx={{
-                  position: "absolute",
-                  left: 10,
-                  top: 10,
-                  width: 270,
-                  height: 153,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  pointerEvents: "none",
+                  width: 180, // 120 * 1.5
+                  height: 120, // 80 * 1.5
+                  objectFit: "cover",
+                  borderRadius: 2,
+                  boxShadow: "0 1px 6px 0 rgba(0,0,0,0.10)",
+                  mr: 3,
+                  border:
+                    item.status === "pronto"
+                      ? "2px solid #FF0000"
+                      : "2px solid #23242b",
+                  transition: "border 0.2s",
+                  flexShrink: 0,
                 }}
-              >
+              />
+              {item.status !== "pronto" && (
                 <Box
                   sx={{
-                    width: 72,
-                    height: 72,
+                    position: "absolute",
+                    left: 25,
+                    top: 26,
+                    width: 182,
+                    height: 120,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
+                    pointerEvents: "none",
+                    background: "rgba(24,26,32,0.60)",
+                    borderRadius: 2,
                   }}
                 >
-                  <ProgressStatus porcentage={item.progress} />
+                  <Box
+                    sx={{
+                      width: 72,
+                      height: 72,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "rgba(0,0,0,0.10)",
+                      borderRadius: "50%",
+                    }}
+                  >
+                    <ProgressStatus porcentage={item.progress} />
+                  </Box>
                 </Box>
-              </Box>
-            )}
-          </Grid>
-          <Grid item md={6}>
-            <Typography sx={{ color: "#fff", fontWeight: 500 }}>
-              {item.name}
-            </Typography>
-            <Typography variant="caption" sx={{ color: "#aaa" }}>
-              {item.date}
-            </Typography>
-          </Grid>
-          <Grid item>
-            {item.status === "enviando" && (
-              <>
-                <CloudSyncOutlinedIcon htmlColor="#7184fb" />
+              )}
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography
+                  sx={{
+                    color: "#fff",
+                    fontWeight: 700,
+                    fontSize: 18,
+                    mb: 0.5,
+                    textOverflow: "ellipsis",
+                    overflow: "hidden",
+                    whiteSpace: "nowrap",
+                  }}
+                  title={item.name}
+                >
+                  {item.name}
+                </Typography>
                 <Typography
                   variant="caption"
-                  color="textSecondary"
-                  sx={{ ml: 1 }}
+                  sx={{ color: "#aaa", fontSize: 13 }}
                 >
-                  {statusText[item.status]}
+                  {item.date}
                 </Typography>
-              </>
-            )}
-            {item.status === "convertendo" && (
-              <Typography variant="caption" color="textSecondary">
-                {statusText[item.status]}
-              </Typography>
-            )}
-            {item.status === "pronto" && (
-              <Button
-                variant="text"
-                startIcon={<DownloadIcon />}
-                onClick={() => onDownload(item.id)}
-                sx={{ color: "#fff" }}
-              >
-                {statusText[item.status]}
-              </Button>
-            )}
+              </Box>
+              <Box sx={{ minWidth: 160, textAlign: "right" }}>
+                {item.status === "enviando" && (
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <CloudSyncOutlinedIcon
+                      htmlColor="#FF0000"
+                      fontSize="small"
+                    />
+                    <Typography
+                      variant="caption"
+                      color="textSecondary"
+                      sx={{ ml: 0.5, color: "#FF0000", fontWeight: 600 }}
+                    >
+                      {statusText[item.status]}
+                    </Typography>
+                  </Box>
+                )}
+                {item.status === "convertendo" && (
+                  <Typography
+                    variant="caption"
+                    color="textSecondary"
+                    sx={{ color: "#fbc02d", fontWeight: 600 }}
+                  >
+                    {statusText[item.status]}
+                  </Typography>
+                )}
+                {item.status === "pronto" && (
+                  <Button
+                    variant="contained"
+                    startIcon={<DownloadIcon />}
+                    onClick={() => onDownload(item.id)}
+                    color="primary"
+                    sx={{
+                      color: "#fff",
+                      background: "#FF0000",
+                      fontWeight: 700,
+                      borderRadius: 2,
+                      px: 3,
+                      py: 1.2,
+                      fontSize: 16,
+                      boxShadow: "0 2px 8px 0 rgba(255,0,0,0.10)",
+                      "&:hover": {
+                        background: "#d90000",
+                        boxShadow: "0 4px 16px 0 rgba(255,0,0,0.18)",
+                      },
+                    }}
+                  >
+                    {statusText[item.status]}
+                  </Button>
+                )}
+              </Box>
+            </Box>
           </Grid>
-        </Grid>
-      ))}
+        ))}
+      </Grid>
     </Box>
   );
 }
+
+// Animação pulse para status
+const style = document.createElement("style");
+style.innerHTML = `@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255,0,0,0.18); } 100% { box-shadow: 0 0 0 8px rgba(255,0,0,0.04); } }`;
+document.head.appendChild(style);
