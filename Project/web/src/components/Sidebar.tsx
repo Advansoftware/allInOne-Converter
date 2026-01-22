@@ -40,6 +40,11 @@ const Sidebar = ({ open, onClose }: SidebarProps) => {
       variant={isMobile ? 'temporary' : 'permanent'}
       open={isMobile ? open : true}
       onClose={onClose}
+      disableScrollLock={true}
+      ModalProps={{
+        keepMounted: true, // Better open performance on mobile
+        disableScrollLock: true,
+      }}
       sx={{
         width: currentWidth,
         flexShrink: 0,

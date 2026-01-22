@@ -5,15 +5,30 @@ import DialogContent from "@mui/material/DialogContent";
 import IconButton from "@mui/material/IconButton";
 import CloseIcon from "@mui/icons-material/Close";
 import Typography from "@mui/material/Typography";
-import { Box, TextField, Button, useMediaQuery, Fade, Slide } from "@mui/material";
+import {
+  Box,
+  TextField,
+  Button,
+  useMediaQuery,
+  Slide,
+  Chip,
+  Tooltip,
+} from "@mui/material";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import LinkIcon from "@mui/icons-material/Link";
 import VideoFileIcon from "@mui/icons-material/VideoFile";
+import FolderIcon from "@mui/icons-material/Folder";
+import YouTubeIcon from "@mui/icons-material/YouTube";
 import { useEffect, useState, forwardRef } from "react";
 import { useDropzone } from "react-dropzone";
 import AdvancedConversionModal from "./AdvancedConversionModal";
+import TorrentDialog from "./TorrentDialog";
+import { useDownload, useUpload } from "../hooks/useApi";
 
-const Transition = forwardRef(function Transition(props: any, ref: React.Ref<unknown>) {
+const Transition = forwardRef(function Transition(
+  props: any,
+  ref: React.Ref<unknown>,
+) {
   return <Slide direction="up" ref={ref} {...props} />;
 });
 
@@ -77,7 +92,8 @@ function BootstrapDialogTitle(props: DialogTitleProps) {
       sx={{
         m: 0,
         p: 2.5,
-        background: "linear-gradient(90deg, rgba(255,0,0,0.1) 0%, transparent 100%)",
+        background:
+          "linear-gradient(90deg, rgba(255,0,0,0.1) 0%, transparent 100%)",
         borderBottom: "1px solid rgba(255,255,255,0.05)",
         display: "flex",
         alignItems: "center",
@@ -122,9 +138,9 @@ function BootstrapDialogTitle(props: DialogTitleProps) {
             borderRadius: 2,
             width: 36,
             height: 36,
-            "&:hover": { 
-              background: "rgba(255,0,0,0.2)", 
-              color: "#FF0000" 
+            "&:hover": {
+              background: "rgba(255,0,0,0.2)",
+              color: "#FF0000",
             },
             transition: "all 0.2s ease",
           }}
@@ -139,8 +155,28 @@ function BootstrapDialogTitle(props: DialogTitleProps) {
 interface DialogUploadProps {
   open: boolean;
   setOpen: (open: boolean) => void;
-  addUpload: (file: { name: string; thumbnail: string }) => void;
+  addUpload: (file: {
+    name: string;
+    thumbnail: string;
+    type?: string;
+    jobId?: string;
+  }) => void;
 }
+
+// Helper to detect URL type
+const detectUrlType = (
+  url: string,
+): "magnet" | "torrent" | "youtube" | "url" | null => {
+  if (!url.trim()) return null;
+  if (url.startsWith("magnet:?")) return "magnet";
+  if (url.match(/\.torrent(\?|$)/i)) return "torrent";
+  if (
+    url.match(/youtube\.com|youtu\.be|vimeo\.com|dailymotion\.com|twitch\.tv/i)
+  )
+    return "youtube";
+  if (url.match(/^https?:\/\//i)) return "url";
+  return null;
+};
 
 export default function DialogUpload({
   open,
@@ -148,20 +184,47 @@ export default function DialogUpload({
   addUpload,
 }: DialogUploadProps) {
   const theme = Mui.useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [url, setUrl] = useState("");
   const [video, setVideo] = useState<File[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showTorrent, setShowTorrent] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
+  const [urlType, setUrlType] = useState<
+    "magnet" | "torrent" | "youtube" | "url" | null
+  >(null);
 
-  const { getRootProps, getInputProps, open: openFileDialog } = useDropzone({
-    accept: { "video/*": [], "audio/*": [], "image/*": [] },
+  const { startDownload } = useDownload();
+  const { upload } = useUpload();
+
+  const {
+    getRootProps,
+    getInputProps,
+    open: openFileDialog,
+  } = useDropzone({
+    accept: {
+      "video/*": [],
+      "audio/*": [],
+      "image/*": [],
+      "application/x-bittorrent": [".torrent"],
+    },
     maxFiles: 1,
     multiple: false,
     noClick: true,
     noKeyboard: true,
     onDrop: (acceptedFiles) => {
-      setVideo(acceptedFiles);
+      const file = acceptedFiles[0];
+      if (file) {
+        // Check if it's a torrent file
+        if (
+          file.name.endsWith(".torrent") ||
+          file.type === "application/x-bittorrent"
+        ) {
+          setShowTorrent(true);
+        } else {
+          setVideo([file]);
+        }
+      }
     },
     onDragEnter: () => setIsDragActive(true),
     onDragLeave: () => setIsDragActive(false),
@@ -170,8 +233,10 @@ export default function DialogUpload({
   const handleClose = () => {
     setOpen(false);
     setShowAdvanced(false);
+    setShowTorrent(false);
     setVideo([]);
     setUrl("");
+    setUrlType(null);
   };
 
   useEffect(() => {
@@ -180,39 +245,84 @@ export default function DialogUpload({
     }
   }, [video]);
 
-  const handleAdvancedConvert = (options: any) => {
+  // Update URL type detection as user types
+  useEffect(() => {
+    setUrlType(detectUrlType(url));
+  }, [url]);
+
+  const handleAdvancedConvert = async (options: any) => {
     if (video.length > 0) {
       const file = video[0];
-      const thumbnail =
-        file.type.startsWith("image/") || file.type.startsWith("video/")
-          ? URL.createObjectURL(file)
-          : "/src/assets/modalImage.svg";
-      addUpload({ name: file.name, thumbnail });
-      setOpen(false);
-      setShowAdvanced(false);
-      setVideo([]);
+      try {
+        const result = await upload(file);
+        const thumbnail =
+          file.type.startsWith("image/") || file.type.startsWith("video/")
+            ? URL.createObjectURL(file)
+            : "/src/assets/modalImage.svg";
+        addUpload({
+          name: file.name,
+          thumbnail,
+          type: "conversion",
+          jobId: result.job_id,
+        });
+      } catch (err) {
+        console.error("Upload failed:", err);
+      }
+      handleClose();
     }
   };
 
-  const handleUrlSubmit = () => {
-    if (url.trim()) {
-      addUpload({ name: url, thumbnail: "/src/assets/modalImage.svg" });
-      setOpen(false);
-      setUrl("");
+  const handleUrlSubmit = async () => {
+    if (!url.trim()) return;
+
+    // If it's a magnet link, open torrent dialog
+    if (urlType === "magnet") {
+      setShowTorrent(true);
+      return;
     }
+
+    // For URLs (YouTube, etc), use download service
+    if (urlType === "youtube" || urlType === "url") {
+      try {
+        const result = await startDownload(url);
+        addUpload({
+          name: url,
+          thumbnail: "/src/assets/modalImage.svg",
+          type: "download",
+          jobId: result.job_id,
+        });
+        handleClose();
+      } catch (err) {
+        console.error("Download failed:", err);
+      }
+    }
+  };
+
+  const handleTorrentAdded = (jobId: string, name: string) => {
+    addUpload({
+      name,
+      thumbnail: "/src/assets/modalImage.svg",
+      type: "torrent",
+      jobId,
+    });
+    handleClose();
   };
 
   return (
     <div>
-      <BootstrapDialog 
-        fullWidth 
-        scroll="body" 
-        maxWidth="sm" 
+      <BootstrapDialog
+        fullWidth
+        scroll="body"
+        maxWidth="sm"
         open={open}
         TransitionComponent={Transition}
         fullScreen={isMobile}
+        disableScrollLock={true}
       >
-        <BootstrapDialogTitle id="customized-dialog-title" onClose={handleClose}>
+        <BootstrapDialogTitle
+          id="customized-dialog-title"
+          onClose={handleClose}
+        >
           Enviar Conteúdo
         </BootstrapDialogTitle>
         <DialogContent>
@@ -221,8 +331,8 @@ export default function DialogUpload({
             <Box
               {...getRootProps()}
               sx={{
-                border: isDragActive 
-                  ? "2px solid #FF0000" 
+                border: isDragActive
+                  ? "2px solid #FF0000"
                   : "2px dashed rgba(255,255,255,0.15)",
                 borderRadius: 3,
                 background: isDragActive
@@ -238,23 +348,27 @@ export default function DialogUpload({
                   borderColor: "rgba(255,0,0,0.5)",
                   background: "rgba(255,0,0,0.04)",
                 },
-                "&::before": isDragActive ? {
-                  content: '""',
-                  position: "absolute",
-                  inset: 0,
-                  background: "radial-gradient(circle at center, rgba(255,0,0,0.1) 0%, transparent 70%)",
-                  animation: "pulse 2s infinite",
-                } : {},
+                "&::before": isDragActive
+                  ? {
+                      content: '""',
+                      position: "absolute",
+                      inset: 0,
+                      background:
+                        "radial-gradient(circle at center, rgba(255,0,0,0.1) 0%, transparent 70%)",
+                      animation: "pulse 2s infinite",
+                    }
+                  : {},
               }}
             >
               <input {...getInputProps()} />
-              
+
               <Box
                 sx={{
                   width: 72,
                   height: 72,
                   borderRadius: "50%",
-                  background: "linear-gradient(135deg, rgba(255,0,0,0.15) 0%, rgba(255,0,0,0.05) 100%)",
+                  background:
+                    "linear-gradient(135deg, rgba(255,0,0,0.15) 0%, rgba(255,0,0,0.05) 100%)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -277,16 +391,16 @@ export default function DialogUpload({
               >
                 Arraste e solte seu arquivo aqui
               </Typography>
-              
+
               <Typography
                 variant="body2"
-                sx={{ 
-                  color: "rgba(255,255,255,0.5)", 
+                sx={{
+                  color: "rgba(255,255,255,0.5)",
                   mb: 2.5,
                   fontSize: { xs: 13, sm: 14 },
                 }}
               >
-                Suporta vídeos, áudios e imagens
+                Suporta vídeos, áudios, imagens e arquivos .torrent
               </Typography>
 
               <Button
@@ -294,7 +408,8 @@ export default function DialogUpload({
                 variant="contained"
                 startIcon={<CloudUploadIcon />}
                 sx={{
-                  background: "linear-gradient(135deg, #FF0000 0%, #cc0000 100%)",
+                  background:
+                    "linear-gradient(135deg, #FF0000 0%, #cc0000 100%)",
                   fontWeight: 600,
                   borderRadius: 2,
                   px: 4,
@@ -303,7 +418,8 @@ export default function DialogUpload({
                   textTransform: "none",
                   boxShadow: "0 4px 20px rgba(255,0,0,0.3)",
                   "&:hover": {
-                    background: "linear-gradient(135deg, #ff1a1a 0%, #e60000 100%)",
+                    background:
+                      "linear-gradient(135deg, #ff1a1a 0%, #e60000 100%)",
                     boxShadow: "0 6px 24px rgba(255,0,0,0.4)",
                     transform: "translateY(-1px)",
                   },
@@ -315,73 +431,150 @@ export default function DialogUpload({
             </Box>
 
             {/* Divider */}
-            <Box 
-              sx={{ 
-                display: "flex", 
-                alignItems: "center", 
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
                 my: 3,
                 gap: 2,
               }}
             >
-              <Box sx={{ flex: 1, height: 1, background: "rgba(255,255,255,0.1)" }} />
-              <Typography 
-                sx={{ 
-                  color: "rgba(255,255,255,0.4)", 
+              <Box
+                sx={{ flex: 1, height: 1, background: "rgba(255,255,255,0.1)" }}
+              />
+              <Typography
+                sx={{
+                  color: "rgba(255,255,255,0.4)",
                   fontSize: 13,
                   fontWeight: 500,
                   textTransform: "uppercase",
                   letterSpacing: 1,
                 }}
               >
-                ou cole uma URL
+                ou cole uma URL / Magnet
               </Typography>
-              <Box sx={{ flex: 1, height: 1, background: "rgba(255,255,255,0.1)" }} />
+              <Box
+                sx={{ flex: 1, height: 1, background: "rgba(255,255,255,0.1)" }}
+              />
             </Box>
 
-            {/* URL Input */}
-            <Box sx={{ display: "flex", gap: 1.5 }}>
-              <StyledTextField
-                fullWidth
-                placeholder="https://youtube.com/watch?v=..."
-                variant="outlined"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleUrlSubmit()}
-                InputProps={{
-                  startAdornment: (
-                    <LinkIcon sx={{ color: "rgba(255,255,255,0.3)", mr: 1.5 }} />
-                  ),
-                }}
-              />
+            {/* URL Input with type detection */}
+            <Box sx={{ display: "flex", gap: 1.5, alignItems: "flex-start" }}>
+              <Box sx={{ flex: 1 }}>
+                <StyledTextField
+                  fullWidth
+                  placeholder="https://youtube.com/... ou magnet:?xt=..."
+                  variant="outlined"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleUrlSubmit()}
+                  InputProps={{
+                    startAdornment:
+                      urlType === "magnet" ? (
+                        <FolderIcon sx={{ color: "#FF9800", mr: 1.5 }} />
+                      ) : urlType === "youtube" ? (
+                        <YouTubeIcon sx={{ color: "#FF0000", mr: 1.5 }} />
+                      ) : (
+                        <LinkIcon
+                          sx={{ color: "rgba(255,255,255,0.3)", mr: 1.5 }}
+                        />
+                      ),
+                  }}
+                />
+                {urlType && (
+                  <Box sx={{ mt: 1, display: "flex", gap: 1 }}>
+                    {urlType === "magnet" && (
+                      <Chip
+                        label="Magnet Link detectado"
+                        size="small"
+                        sx={{
+                          backgroundColor: "rgba(255,152,0,0.2)",
+                          color: "#FF9800",
+                          fontSize: 11,
+                        }}
+                      />
+                    )}
+                    {urlType === "youtube" && (
+                      <Chip
+                        label="Vídeo de streaming"
+                        size="small"
+                        sx={{
+                          backgroundColor: "rgba(255,0,0,0.2)",
+                          color: "#FF5252",
+                          fontSize: 11,
+                        }}
+                      />
+                    )}
+                  </Box>
+                )}
+              </Box>
+              <Tooltip
+                title={urlType === "magnet" ? "Adicionar Torrent" : "Baixar"}
+              >
+                <span>
+                  <Button
+                    onClick={handleUrlSubmit}
+                    disabled={!url.trim()}
+                    variant="contained"
+                    sx={{
+                      minWidth: 56,
+                      height: 56,
+                      borderRadius: 3,
+                      background: url.trim()
+                        ? urlType === "magnet"
+                          ? "linear-gradient(135deg, #FF9800 0%, #F57C00 100%)"
+                          : "linear-gradient(135deg, #FF0000 0%, #cc0000 100%)"
+                        : "rgba(255,255,255,0.05)",
+                      boxShadow: url.trim()
+                        ? "0 4px 16px rgba(255,0,0,0.3)"
+                        : "none",
+                      "&:hover": {
+                        background:
+                          urlType === "magnet"
+                            ? "linear-gradient(135deg, #FFA726 0%, #FB8C00 100%)"
+                            : "linear-gradient(135deg, #ff1a1a 0%, #e60000 100%)",
+                        boxShadow: "0 6px 20px rgba(255,0,0,0.4)",
+                      },
+                      "&:disabled": {
+                        background: "rgba(255,255,255,0.05)",
+                      },
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    {urlType === "magnet" ? (
+                      <FolderIcon />
+                    ) : (
+                      <CloudUploadIcon />
+                    )}
+                  </Button>
+                </span>
+              </Tooltip>
+            </Box>
+
+            {/* Torrent button */}
+            <Box sx={{ mt: 3, textAlign: "center" }}>
               <Button
-                onClick={handleUrlSubmit}
-                disabled={!url.trim()}
-                variant="contained"
+                variant="outlined"
+                startIcon={<FolderIcon />}
+                onClick={() => setShowTorrent(true)}
                 sx={{
-                  minWidth: 56,
-                  height: 56,
-                  borderRadius: 3,
-                  background: url.trim() 
-                    ? "linear-gradient(135deg, #FF0000 0%, #cc0000 100%)"
-                    : "rgba(255,255,255,0.05)",
-                  boxShadow: url.trim() ? "0 4px 16px rgba(255,0,0,0.3)" : "none",
+                  borderColor: "rgba(255,152,0,0.5)",
+                  color: "#FF9800",
+                  borderRadius: 2,
+                  textTransform: "none",
                   "&:hover": {
-                    background: "linear-gradient(135deg, #ff1a1a 0%, #e60000 100%)",
-                    boxShadow: "0 6px 20px rgba(255,0,0,0.4)",
+                    borderColor: "#FF9800",
+                    backgroundColor: "rgba(255,152,0,0.1)",
                   },
-                  "&:disabled": {
-                    background: "rgba(255,255,255,0.05)",
-                  },
-                  transition: "all 0.2s ease",
                 }}
               >
-                <CloudUploadIcon />
+                Adicionar Torrent
               </Button>
             </Box>
           </Box>
         </DialogContent>
       </BootstrapDialog>
-      
+
       <AdvancedConversionModal
         open={showAdvanced}
         onClose={() => {
@@ -389,6 +582,12 @@ export default function DialogUpload({
           setVideo([]);
         }}
         onConvert={handleAdvancedConvert}
+      />
+
+      <TorrentDialog
+        open={showTorrent}
+        onClose={() => setShowTorrent(false)}
+        onTorrentAdded={handleTorrentAdded}
       />
     </div>
   );

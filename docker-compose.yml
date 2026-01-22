@@ -1,54 +1,279 @@
-version: '3'
+version: "3.8"
 
 services:
-  server-node:
-    container_name: web-server-node-allone-converter
-    build: infra/web-server/node
-    entrypoint: "/usr/local/bin/node-entrypoint.sh"
-    tty: true
+  # ===========================================
+  # FRONTEND - React/Vite
+  # ===========================================
+  frontend:
+    container_name: allone-frontend
+    build:
+      context: ./services/frontend
+      dockerfile: Dockerfile
     volumes:
       - ./Project/web:/app
-    working_dir: /app
+      - /app/node_modules
     ports:
-      - '9001:5173'
+      - "3000:5173"
     environment:
+      - VITE_API_URL=http://localhost:8080
       - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - api
     networks:
-      allone-converter:
-        ipv4_address: 172.21.0.2
+      - allone-network
+    restart: unless-stopped
 
-  server-api:
-    container_name: web-server-api-allone-converter
-    build: infra/web-server/nginx
-    ports:
-      - "8081:8080"
-    env_file:
-      - infra/web-server/nginx/.env-api
+  # ===========================================
+  # API GATEWAY - Laravel/PHP
+  # ===========================================
+  api:
+    container_name: allone-api
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
     volumes:
-      - ./Project:/var/www/html
+      - ./Project/api:/var/www/html
+      - shared-storage:/var/www/html/storage/app/public
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - APP_KEY=base64:YourGeneratedKeyHere123456789012
+      - DB_CONNECTION=mysql
+      - DB_HOST=database
+      - DB_PORT=3306
+      - DB_DATABASE=allone_converter
+      - DB_USERNAME=allone
+      - DB_PASSWORD=allone_secret
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CONVERTER_SERVICE_URL=http://converter:8000
+      - DOWNLOADER_SERVICE_URL=http://downloader:8000
+      - TORRENT_SERVICE_URL=http://torrent:8000
+      - STREAMER_SERVICE_URL=http://streamer:8000
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
-      allone-converter:
-        ipv4_address: 172.21.0.3
+      - allone-network
+    restart: unless-stopped
 
-  server-data-base:
-    container_name: data-base-allone-converter
-    build: infra/data-base/mysql-5.7.22
+  # ===========================================
+  # CONVERTER SERVICE - Python/FFmpeg
+  # ===========================================
+  converter:
+    container_name: allone-converter
+    build:
+      context: ./services/converter
+      dockerfile: Dockerfile
+    volumes:
+      - shared-storage:/app/storage
+      - ./services/converter/app:/app/src
+    ports:
+      - "8001:8000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - STORAGE_PATH=/app/storage
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - allone-network
+    restart: unless-stopped
+
+  # ===========================================
+  # DOWNLOADER SERVICE - Python/yt-dlp
+  # ===========================================
+  downloader:
+    container_name: allone-downloader
+    build:
+      context: ./services/downloader
+      dockerfile: Dockerfile
+    volumes:
+      - shared-storage:/app/storage
+      - ./services/downloader/app:/app/src
+    ports:
+      - "8002:8000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - STORAGE_PATH=/app/storage
+      - CONVERTER_SERVICE_URL=http://converter:8000
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - allone-network
+    restart: unless-stopped
+
+  # ===========================================
+  # TORRENT SERVICE - Python/libtorrent
+  # ===========================================
+  torrent:
+    container_name: allone-torrent
+    build:
+      context: ./services/torrent
+      dockerfile: Dockerfile
+    volumes:
+      - shared-storage:/app/storage
+      - torrent-data:/app/downloads
+      - ./services/torrent/app:/app/src
+    ports:
+      - "8003:8000"
+      - "6881:6881"
+      - "6881:6881/udp"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - STORAGE_PATH=/app/storage
+      - DOWNLOAD_PATH=/app/downloads
+      - CONVERTER_SERVICE_URL=http://converter:8000
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - allone-network
+    restart: unless-stopped
+
+  # ===========================================
+  # STREAMER SERVICE - Python/HLS
+  # ===========================================
+  streamer:
+    container_name: allone-streamer
+    build:
+      context: ./services/streamer
+      dockerfile: Dockerfile
+    volumes:
+      - shared-storage:/app/storage:ro
+      - torrent-data:/app/downloads:ro
+      - stream-cache:/app/cache
+      - ./services/streamer/app:/app/src
+    ports:
+      - "8004:8000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - STORAGE_PATH=/app/storage
+      - CACHE_PATH=/app/cache
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - allone-network
+    restart: unless-stopped
+
+  # ===========================================
+  # QUEUE WORKER - Laravel Queue Worker
+  # ===========================================
+  queue-worker:
+    container_name: allone-queue-worker
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    command: php artisan queue:work redis --sleep=3 --tries=3 --max-time=3600
+    volumes:
+      - ./Project/api:/var/www/html
+      - shared-storage:/var/www/html/storage/app/public
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - APP_KEY=base64:YourGeneratedKeyHere123456789012
+      - DB_CONNECTION=mysql
+      - DB_HOST=database
+      - DB_PORT=3306
+      - DB_DATABASE=allone_converter
+      - DB_USERNAME=allone
+      - DB_PASSWORD=allone_secret
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CONVERTER_SERVICE_URL=http://converter:8000
+      - DOWNLOADER_SERVICE_URL=http://downloader:8000
+      - TORRENT_SERVICE_URL=http://torrent:8000
+      - STREAMER_SERVICE_URL=http://streamer:8000
+    depends_on:
+      - api
+      - redis
+    networks:
+      - allone-network
+    restart: unless-stopped
+
+  # ===========================================
+  # REDIS - Queue & Cache
+  # ===========================================
+  redis:
+    container_name: allone-redis
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - allone-network
+    restart: unless-stopped
+
+  # ===========================================
+  # DATABASE - MySQL
+  # ===========================================
+  database:
+    container_name: allone-database
+    image: mysql:8.0
     ports:
       - "3306:3306"
     volumes:
-      - ./Project/.docker/dbdata:/var/lib/mysql
+      - mysql-data:/var/lib/mysql
+      - ./services/database/init:/docker-entrypoint-initdb.d
     environment:
-     MYSQL_ROOT_PASSWORD: allone-converter
-     MYSQL_DATABASE: allone-converter
-     MYSQL_USER: allone-converter
-     MYSQL_PASSWORD: allone-converter
+      - MYSQL_ROOT_PASSWORD=root_secret
+      - MYSQL_DATABASE=allone_converter
+      - MYSQL_USER=allone
+      - MYSQL_PASSWORD=allone_secret
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-proot_secret",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
-      allone-converter:
-        ipv4_address: 172.21.0.4
+      - allone-network
+    restart: unless-stopped
 
+# ===========================================
+# NETWORKS
+# ===========================================
 networks:
-  allone-converter:
-    ipam:
-      driver: default
-      config:
-      - subnet: 172.21.0.0/24
+  allone-network:
+    driver: bridge
+
+# ===========================================
+# VOLUMES
+# ===========================================
+volumes:
+  shared-storage:
+    driver: local
+  torrent-data:
+    driver: local
+  stream-cache:
+    driver: local
+  redis-data:
+    driver: local
+  mysql-data:
+    driver: local
