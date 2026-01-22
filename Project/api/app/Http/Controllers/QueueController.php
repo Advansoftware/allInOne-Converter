@@ -113,18 +113,49 @@ class QueueController extends Controller
     }
 
     /**
-     * Cancel/remove a job
+     * Cancel/remove a job and delete associated files
      */
     public function destroy($jobId)
     {
         $redis = $this->redis();
+        $filesDeleted = [];
 
-        // Try to remove from all job types
-        $redis->del("conversion:job:{$jobId}");
-        $redis->del("download:job:{$jobId}");
-        $redis->del("torrent:job:{$jobId}");
+        // Try to get job data before deleting to find files
+        $jobTypes = ['conversion', 'download', 'torrent'];
+        
+        foreach ($jobTypes as $type) {
+            $jobData = $redis->hgetall("{$type}:job:{$jobId}");
+            if ($jobData && !empty($jobData['output_path'])) {
+                $filePath = $jobData['output_path'];
+                
+                // Delete the file if it exists
+                if (file_exists($filePath)) {
+                    @unlink($filePath);
+                    $filesDeleted[] = $filePath;
+                }
+                
+                // Also try to delete any related files (same job_id prefix)
+                $directory = dirname($filePath);
+                if (is_dir($directory)) {
+                    $files = glob($directory . '/' . $jobId . '*');
+                    foreach ($files as $file) {
+                        if (is_file($file)) {
+                            @unlink($file);
+                            $filesDeleted[] = $file;
+                        }
+                    }
+                }
+            }
+            
+            // Delete the Redis key
+            $redis->del("{$type}:job:{$jobId}");
+        }
 
-        return response()->json(['status' => 'removed']);
+        return response()->json([
+            'status' => 'removed',
+            'job_id' => $jobId,
+            'files_deleted' => count($filesDeleted),
+        ]);
     }
 
     /**

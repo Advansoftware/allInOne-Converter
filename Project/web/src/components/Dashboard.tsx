@@ -4,12 +4,19 @@ import ConverterPageButton from "./ConverterPageButton";
 import UploadQueue from "./UploadQueue";
 import DialogUpload from "./DialogUpload";
 import TorrentManager from "./TorrentManager";
+import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
 import { useQueue } from "../hooks/useApi";
 import { QueueItem } from "../services/api";
 
 function Dashboard() {
   const [open, setOpen] = useState(false);
   const [torrentJobId, setTorrentJobId] = useState<string | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean;
+    id: string;
+    name: string;
+  }>({ open: false, id: "", name: "" });
+  const [deleting, setDeleting] = useState(false);
   const { jobs, stats, loading, refresh, removeJob } = useQueue(2000);
 
   // Transform queue items to upload format
@@ -18,8 +25,11 @@ function Dashboard() {
     name: (job as any).title || (job as any).name || job.job_id.slice(0, 8),
     date: new Date().toLocaleDateString(),
     thumbnail: (job as any).thumbnail || "/src/assets/modalImage.svg",
-    progress: job.progress,
-    status: mapStatus(job.status, job.type),
+    progress:
+      typeof job.progress === "string"
+        ? parseFloat(job.progress) || 0
+        : job.progress,
+    status: mapStatus(String(job.status), job.type),
     type: job.type,
     downloadUrl: job.output_path,
   }));
@@ -57,8 +67,27 @@ function Dashboard() {
     setTorrentJobId(jobId);
   };
 
-  const handleRemove = async (id: string) => {
-    await removeJob(id);
+  const handleRemoveClick = (id: string) => {
+    const upload = uploads.find((u) => u.id === id);
+    setDeleteDialog({
+      open: true,
+      id,
+      name: upload?.name || id.slice(0, 8),
+    });
+  };
+
+  const handleConfirmDelete = async () => {
+    setDeleting(true);
+    try {
+      await removeJob(deleteDialog.id);
+    } finally {
+      setDeleting(false);
+      setDeleteDialog({ open: false, id: "", name: "" });
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteDialog({ open: false, id: "", name: "" });
   };
 
   const addUpload = (file: {
@@ -120,7 +149,15 @@ function Dashboard() {
         uploads={uploads}
         onDownload={handleDownload}
         onOpenTorrent={handleOpenTorrent}
-        onRemove={handleRemove}
+        onRemove={handleRemoveClick}
+      />
+
+      <ConfirmDeleteDialog
+        open={deleteDialog.open}
+        itemName={deleteDialog.name}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+        loading={deleting}
       />
 
       {torrentJobId && (
