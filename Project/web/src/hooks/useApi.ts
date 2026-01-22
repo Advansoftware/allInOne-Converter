@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { queueService, conversionService, downloadService, torrentService, QueueItem, JobStatus, TorrentStatus } from '../services/api';
+import { queueService, conversionService, downloadService, torrentService, QueueItem, JobStatus, TorrentStatus, ConversionOptions } from '../services/api';
 import websocketService, { JobUpdate } from '../services/websocket';
 
 // ============================================
@@ -41,6 +41,13 @@ export function useQueue(_pollInterval = 5000) {
 
       setJobs(prevJobs => {
         const existingIndex = prevJobs.findIndex(j => j.job_id === update.job_id);
+        const existingJob = existingIndex >= 0 ? prevJobs[existingIndex] : null;
+
+        // Extract thumbnail from metadata or keep existing
+        const thumbnail = update.metadata?.thumbnail
+          || update.metadata?.thumbnail_url
+          || (existingJob as any)?.thumbnail
+          || undefined;
 
         const newJob = {
           job_id: update.job_id,
@@ -49,15 +56,12 @@ export function useQueue(_pollInterval = 5000) {
           progress: update.progress,
           output_path: update.metadata?.output_path,
           error: update.error || undefined,
-          title: existingIndex >= 0
-            ? (prevJobs[existingIndex] as any).title
-            : (update.file_name || undefined),
-          name: existingIndex >= 0
-            ? (prevJobs[existingIndex] as any).name
-            : (update.file_name || undefined),
-          thumbnail: existingIndex >= 0
-            ? (prevJobs[existingIndex] as any).thumbnail
-            : undefined,
+          title: update.metadata?.title || (existingJob as any)?.title || update.file_name || undefined,
+          name: update.file_name || (existingJob as any)?.name || undefined,
+          thumbnail: thumbnail,
+          // Keep additional metadata
+          duration: update.metadata?.duration || (existingJob as any)?.duration,
+          format: update.metadata?.format || (existingJob as any)?.format,
         } as QueueItem;
 
         if (existingIndex >= 0) {
@@ -164,14 +168,19 @@ export function useUpload() {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const upload = useCallback(async (file: File) => {
+  const upload = useCallback(async (
+    file: File,
+    options?: ConversionOptions,
+    onProgress?: (progress: number) => void
+  ) => {
     setUploading(true);
     setProgress(0);
     setError(null);
 
     try {
-      const response = await conversionService.upload(file, (prog) => {
+      const response = await conversionService.upload(file, options, (prog) => {
         setProgress(prog);
+        onProgress?.(prog);
       });
       return response.data;
     } catch (err: any) {

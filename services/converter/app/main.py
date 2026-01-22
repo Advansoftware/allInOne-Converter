@@ -105,7 +105,8 @@ def get_job_key(job_id: str) -> str:
 
 
 def update_job_status(job_id: str, status: str, progress: float = 0, 
-                      output_path: str = None, error: str = None):
+                      output_path: str = None, error: str = None,
+                      thumbnail: str = None, title: str = None):
     """Update job status in Redis"""
     job_data = {
         "job_id": job_id,
@@ -114,6 +115,13 @@ def update_job_status(job_id: str, status: str, progress: float = 0,
         "output_path": output_path or "",
         "error": error or ""
     }
+    
+    # Add optional fields
+    if thumbnail:
+        job_data["thumbnail"] = thumbnail
+    if title:
+        job_data["title"] = title
+    
     redis_client.hset(get_job_key(job_id), mapping=job_data)
     redis_client.expire(get_job_key(job_id), 86400)  # 24h expiry
     
@@ -145,10 +153,63 @@ def get_media_info(input_path: str) -> dict:
         return {"error": str(e)}
 
 
+async def generate_thumbnail_for_job(job_id: str, input_path: str) -> str:
+    """Generate a thumbnail for a job and return the path"""
+    try:
+        thumb_dir = os.path.join(settings.storage_path, "thumbnails")
+        os.makedirs(thumb_dir, exist_ok=True)
+        
+        output_path = os.path.join(thumb_dir, f"{job_id}.jpg")
+        
+        # Check if file is a video by looking at streams
+        info = get_media_info(input_path)
+        has_video = False
+        if "streams" in info:
+            for stream in info["streams"]:
+                if stream.get("codec_type") == "video":
+                    has_video = True
+                    break
+        
+        if not has_video:
+            return ""
+        
+        # Generate thumbnail at 1 second mark
+        cmd = [
+            "ffmpeg", "-y", "-i", input_path,
+            "-ss", "00:00:01", "-vframes", "1",
+            "-vf", "scale=320:180:force_original_aspect_ratio=decrease,pad=320:180:(ow-iw)/2:(oh-ih)/2",
+            output_path
+        ]
+        
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        await process.wait()
+        
+        if process.returncode == 0 and os.path.exists(output_path):
+            return output_path
+        return ""
+    except Exception as e:
+        print(f"Error generating thumbnail: {e}")
+        return ""
+
+
 async def run_conversion(job_id: str, input_path: str, output_path: str, 
                          ffmpeg_params: str):
     """Run FFmpeg conversion with progress tracking"""
     update_job_status(job_id, "processing", 0)
+    
+    # Generate thumbnail first
+    thumbnail_path = await generate_thumbnail_for_job(job_id, input_path)
+    if thumbnail_path:
+        # Update job with thumbnail and publish update
+        redis_client.hset(get_job_key(job_id), "thumbnail", thumbnail_path)
+        # Publish thumbnail update so WebSocket relay can forward it
+        job_data = redis_client.hgetall(get_job_key(job_id))
+        job_data["thumbnail"] = thumbnail_path
+        redis_client.publish(f"conversion:status:{job_id}", json.dumps(job_data))
     
     duration = get_video_duration(input_path)
     

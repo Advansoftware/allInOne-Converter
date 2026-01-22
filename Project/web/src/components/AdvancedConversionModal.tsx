@@ -33,6 +33,7 @@ interface AdvancedConversionModalProps {
   open: boolean;
   onClose: () => void;
   onConvert: (options: any) => void;
+  sourceName?: string;
 }
 
 const videoFormats = ["mp4", "mov", "avi", "webm", "mkv", "gif"];
@@ -58,6 +59,7 @@ const presets = [
 
 const resolutions = [
   { label: "Original", value: "" },
+  { label: "Manter original", value: "original" },
   { label: "4K (3840x2160)", value: "3840:2160" },
   { label: "Full HD (1920x1080)", value: "1920:1080" },
   { label: "HD (1280x720)", value: "1280:720" },
@@ -69,6 +71,7 @@ const AdvancedConversionModal: React.FC<AdvancedConversionModalProps> = ({
   open,
   onClose,
   onConvert,
+  sourceName,
 }) => {
   const [selectedProfile, setSelectedProfile] = useState<string>("");
   const [format, setFormat] = useState<string>("mp4");
@@ -240,8 +243,24 @@ const AdvancedConversionModal: React.FC<AdvancedConversionModalProps> = ({
               fontFamily: "Inter, Segoe UI, Arial",
             }}
           >
-            Conversor Avançado
+            Configurar Conversão
           </Typography>
+          {sourceName && (
+            <Typography
+              variant="body2"
+              sx={{
+                color: "rgba(255,255,255,0.5)",
+                ml: 2,
+                maxWidth: 400,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              title={sourceName}
+            >
+              {sourceName}
+            </Typography>
+          )}
         </Box>
         <Box sx={{ flex: 1 }} />
         <IconButton

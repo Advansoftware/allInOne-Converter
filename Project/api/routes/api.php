@@ -81,7 +81,11 @@ Route::prefix('stream')->group(function () {
     Route::get('/{streamId}/{segment}', [StreamController::class, 'segment']);
     Route::delete('/preview/{previewId}', [StreamController::class, 'deletePreview']);
     Route::post('/cache/cleanup', [StreamController::class, 'cleanupCache']);
+    Route::get('/video/{jobId}', [StreamController::class, 'streamByJobId']);
 });
+
+// Thumbnails route - serve cached thumbnails
+Route::get('/thumbnails/{filename}', [QueueController::class, 'serveThumbnail']);
 
 // Queue routes
 Route::prefix('queue')->group(function () {

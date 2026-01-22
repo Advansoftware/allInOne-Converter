@@ -34,6 +34,7 @@ import FolderIcon from "@mui/icons-material/Folder";
 import { useDropzone } from "react-dropzone";
 import { useTorrent } from "../hooks/useApi";
 import { TorrentFile } from "../services/api";
+import AdvancedConversionModal from "./AdvancedConversionModal";
 
 interface TorrentDialogProps {
   open: boolean;
@@ -77,6 +78,11 @@ const TorrentDialog: React.FC<TorrentDialogProps> = ({
   const [convertProfile, setConvertProfile] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showConversionModal, setShowConversionModal] = useState(false);
+  const [pendingTorrentData, setPendingTorrentData] = useState<{
+    type: "magnet" | "file";
+    data: string | File;
+  } | null>(null);
 
   const { addMagnet, addFile, parseFile, parseMagnet } = useTorrent();
 
@@ -121,14 +127,29 @@ const TorrentDialog: React.FC<TorrentDialogProps> = ({
   };
 
   const handleStartDownload = async () => {
+    // Instead of starting immediately, open conversion modal first
+    if (tab === 0 && magnetUrl) {
+      setPendingTorrentData({ type: "magnet", data: magnetUrl });
+      setShowConversionModal(true);
+    } else if (tab === 1 && torrentFile) {
+      setPendingTorrentData({ type: "file", data: torrentFile });
+      setShowConversionModal(true);
+    }
+  };
+
+  const handleConversionConfirm = async (options: any) => {
+    if (!pendingTorrentData) return;
+
     setLoading(true);
     setError(null);
+    setShowConversionModal(false);
+
     try {
       let result;
-      if (tab === 0 && magnetUrl) {
-        result = await addMagnet(magnetUrl);
-      } else if (tab === 1 && torrentFile) {
-        result = await addFile(torrentFile);
+      if (pendingTorrentData.type === "magnet") {
+        result = await addMagnet(pendingTorrentData.data as string);
+      } else {
+        result = await addFile(pendingTorrentData.data as File);
       }
 
       if (result) {
@@ -139,7 +160,13 @@ const TorrentDialog: React.FC<TorrentDialogProps> = ({
       setError(err.message || "Erro ao adicionar torrent");
     } finally {
       setLoading(false);
+      setPendingTorrentData(null);
     }
+  };
+
+  const handleConversionClose = () => {
+    setShowConversionModal(false);
+    setPendingTorrentData(null);
   };
 
   const handleClose = () => {
@@ -149,6 +176,8 @@ const TorrentDialog: React.FC<TorrentDialogProps> = ({
     setSelectedFiles([]);
     setConvertProfile("");
     setError(null);
+    setShowConversionModal(false);
+    setPendingTorrentData(null);
     onClose();
   };
 
@@ -436,9 +465,19 @@ const TorrentDialog: React.FC<TorrentDialogProps> = ({
             "&:disabled": { backgroundColor: "rgba(255,0,0,0.3)" },
           }}
         >
-          Iniciar Download
+          Configurar & Baixar
         </Button>
       </DialogActions>
+
+      {/* Conversion Configuration Modal */}
+      <AdvancedConversionModal
+        open={showConversionModal}
+        onClose={handleConversionClose}
+        onConvert={handleConversionConfirm}
+        sourceName={
+          parsedInfo?.name || (tab === 0 ? magnetUrl : torrentFile?.name)
+        }
+      />
     </Dialog>
   );
 };

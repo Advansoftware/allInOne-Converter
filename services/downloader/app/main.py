@@ -83,6 +83,38 @@ def get_job_key(job_id: str) -> str:
     return f"download:job:{job_id}"
 
 
+def get_thumbnail_path(job_id: str) -> str:
+    """Get local thumbnail path for a job"""
+    thumb_dir = os.path.join(settings.storage_path, "thumbnails")
+    os.makedirs(thumb_dir, exist_ok=True)
+    return os.path.join(thumb_dir, f"{job_id}.jpg")
+
+
+async def download_thumbnail(url: str, job_id: str) -> Optional[str]:
+    """Download thumbnail and save locally, return local path or URL"""
+    if not url:
+        return None
+    
+    local_path = get_thumbnail_path(job_id)
+    
+    # Check if already cached
+    if os.path.exists(local_path):
+        return f"/api/thumbnails/{job_id}.jpg"
+    
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(url)
+            if response.status_code == 200:
+                with open(local_path, 'wb') as f:
+                    f.write(response.content)
+                return f"/api/thumbnails/{job_id}.jpg"
+    except Exception as e:
+        print(f"Failed to download thumbnail: {e}")
+    
+    # Fallback to original URL if download fails
+    return url
+
+
 async def send_websocket_event(job_id: str, status: str, progress: float = 0,
                                 title: str = None, output_path: str = None,
                                 error: str = None, thumbnail: str = None):
@@ -225,12 +257,33 @@ async def run_download(job_id: str, url: str, format_id: str, convert_to: str = 
     }
     
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Get info first
-            info = ydl.extract_info(url, download=False)
+        # PRIORITY 1: Get info (title + thumbnail) FIRST before anything else
+        # This provides immediate feedback to the user
+        info_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'skip_download': True,
+        }
+        
+        # Check if thumbnail already cached
+        cached_thumb = get_thumbnail_path(job_id)
+        local_thumbnail = None
+        if os.path.exists(cached_thumb):
+            local_thumbnail = f"/api/thumbnails/{job_id}.jpg"
+        
+        with yt_dlp.YoutubeDL(info_opts) as ydl_info:
+            info = ydl_info.extract_info(url, download=False)
             progress_hook.title = info.get('title', 'Unknown')
-            progress_hook.thumbnail = info.get('thumbnail')
+            original_thumbnail = info.get('thumbnail')
             
+            # Use cached thumbnail or download new one
+            if local_thumbnail:
+                progress_hook.thumbnail = local_thumbnail
+            elif original_thumbnail:
+                # Download and cache thumbnail in background
+                progress_hook.thumbnail = await download_thumbnail(original_thumbnail, job_id)
+            
+            # Immediately send the title and thumbnail to frontend
             update_job_status(
                 job_id, 
                 "downloading", 
@@ -238,7 +291,9 @@ async def run_download(job_id: str, url: str, format_id: str, convert_to: str = 
                 title=progress_hook.title,
                 thumbnail=progress_hook.thumbnail
             )
-            
+        
+        # Now start the actual download
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             # Download
             ydl.download([url])
             

@@ -161,6 +161,10 @@ interface DialogUploadProps {
     type?: string;
     jobId?: string;
   }) => void;
+  onUploadStart?: (id: string, name: string, thumbnail: string) => void;
+  onUploadProgress?: (id: string, progress: number) => void;
+  onUploadComplete?: (id: string, jobId: string) => void;
+  onUploadError?: (id: string, error: string) => void;
 }
 
 // Helper to detect URL type
@@ -182,6 +186,10 @@ export default function DialogUpload({
   open,
   setOpen,
   addUpload,
+  onUploadStart,
+  onUploadProgress,
+  onUploadComplete,
+  onUploadError,
 }: DialogUploadProps) {
   const theme = Mui.useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -193,6 +201,9 @@ export default function DialogUpload({
   const [urlType, setUrlType] = useState<
     "magnet" | "torrent" | "youtube" | "url" | null
   >(null);
+  // New state: pending submission waiting for conversion config
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
+  const [conversionOptions, setConversionOptions] = useState<any>(null);
 
   const { startDownload } = useDownload();
   const { upload } = useUpload();
@@ -237,41 +248,100 @@ export default function DialogUpload({
     setVideo([]);
     setUrl("");
     setUrlType(null);
+    setPendingUrl(null);
+    setConversionOptions(null);
   };
 
   useEffect(() => {
+    // Show advanced config when file is dropped or URL is submitted
     if (video.length > 0 && !showAdvanced) {
       setShowAdvanced(true);
     }
   }, [video]);
+
+  // Show advanced modal when URL is ready to be submitted
+  useEffect(() => {
+    if (pendingUrl && !showAdvanced) {
+      setShowAdvanced(true);
+    }
+  }, [pendingUrl]);
 
   // Update URL type detection as user types
   useEffect(() => {
     setUrlType(detectUrlType(url));
   }, [url]);
 
+  // Handle conversion config submission (for both files and URLs)
   const handleAdvancedConvert = async (options: any) => {
+    // Save conversion options for future use (when conversion is implemented on backend)
+    setConversionOptions(options);
+
+    // Handle file upload with conversion
     if (video.length > 0) {
       const file = video[0];
+      const uploadId = `upload-${Date.now()}`;
+      const thumbnail =
+        file.type.startsWith("image/") || file.type.startsWith("video/")
+          ? URL.createObjectURL(file)
+          : "/src/assets/modalImage.svg";
+
+      // Notify that upload is starting
+      onUploadStart?.(uploadId, file.name, thumbnail);
+
+      // Close dialog immediately so user can see progress in queue
+      handleClose();
+
       try {
-        const result = await upload(file);
-        const thumbnail =
-          file.type.startsWith("image/") || file.type.startsWith("video/")
-            ? URL.createObjectURL(file)
-            : "/src/assets/modalImage.svg";
+        // Build conversion options to send to backend
+        const conversionOpts = {
+          format: options.format || "mp4",
+          ffmpeg_params: options.ffmpegParams || undefined,
+        };
+
+        const result = await upload(file, conversionOpts, (progress) => {
+          onUploadProgress?.(uploadId, progress);
+        });
+
+        // Upload complete - notify with job id
+        onUploadComplete?.(uploadId, result.job_id);
+
         addUpload({
           name: file.name,
           thumbnail,
           type: "conversion",
           jobId: result.job_id,
         });
-      } catch (err) {
+      } catch (err: any) {
         console.error("Upload failed:", err);
+        onUploadError?.(uploadId, err.message || "Upload failed");
       }
-      handleClose();
+      return;
+    }
+
+    // Handle URL download with conversion options
+    if (pendingUrl) {
+      try {
+        // Pass conversion options to download service
+        const result = await startDownload(
+          pendingUrl,
+          options.format || undefined,
+          options.format !== "original" ? options.format : undefined,
+        );
+        addUpload({
+          name: pendingUrl,
+          thumbnail: "/src/assets/modalImage.svg",
+          type: "download",
+          jobId: result.job_id,
+        });
+        handleClose();
+      } catch (err) {
+        console.error("Download failed:", err);
+      }
+      return;
     }
   };
 
+  // Handle URL submission - now opens conversion config first
   const handleUrlSubmit = async () => {
     if (!url.trim()) return;
 
@@ -281,21 +351,18 @@ export default function DialogUpload({
       return;
     }
 
-    // For URLs (YouTube, etc), use download service
+    // For URLs (YouTube, etc), show conversion config first
     if (urlType === "youtube" || urlType === "url") {
-      try {
-        const result = await startDownload(url);
-        addUpload({
-          name: url,
-          thumbnail: "/src/assets/modalImage.svg",
-          type: "download",
-          jobId: result.job_id,
-        });
-        handleClose();
-      } catch (err) {
-        console.error("Download failed:", err);
-      }
+      setPendingUrl(url);
+      // This will trigger useEffect to show the advanced modal
     }
+  };
+
+  // Handle closing advanced modal without submitting
+  const handleAdvancedClose = () => {
+    setShowAdvanced(false);
+    setPendingUrl(null);
+    setVideo([]);
   };
 
   const handleTorrentAdded = (jobId: string, name: string) => {
@@ -577,11 +644,11 @@ export default function DialogUpload({
 
       <AdvancedConversionModal
         open={showAdvanced}
-        onClose={() => {
-          setShowAdvanced(false);
-          setVideo([]);
-        }}
+        onClose={handleAdvancedClose}
         onConvert={handleAdvancedConvert}
+        sourceName={
+          pendingUrl || (video.length > 0 ? video[0].name : undefined)
+        }
       />
 
       <TorrentDialog

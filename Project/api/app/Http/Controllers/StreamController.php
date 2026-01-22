@@ -156,4 +156,105 @@ class StreamController extends Controller
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
+
+    /**
+     * Stream video file directly by job ID
+     */
+    public function streamByJobId($jobId)
+    {
+        try {
+            // Get job info from Redis
+            $redis = \Illuminate\Support\Facades\Redis::connection('jobs');
+            $jobData = $redis->get("job:{$jobId}");
+            
+            // Also check hash format used by downloader
+            if (!$jobData) {
+                $hashData = $redis->hgetall("download:job:{$jobId}");
+                if (!empty($hashData)) {
+                    $jobData = json_encode($hashData);
+                }
+            }
+            
+            if (!$jobData) {
+                return response()->json(['error' => 'Job not found'], 404);
+            }
+            
+            $data = is_string($jobData) ? json_decode($jobData, true) : $jobData;
+            
+            // For streaming, we allow any status that has output_path (even during download)
+            $filePath = $data['output_path'] ?? null;
+            if (!$filePath || !file_exists($filePath)) {
+                return response()->json(['error' => 'File not available yet'], 404);
+            }
+            
+            // Get file info
+            $mimeType = mime_content_type($filePath);
+            $fileSize = filesize($filePath);
+            $fileName = basename($filePath);
+            
+            // Handle range requests for video seeking
+            $headers = [
+                'Content-Type' => $mimeType,
+                'Accept-Ranges' => 'bytes',
+                'Content-Disposition' => "inline; filename=\"{$fileName}\"",
+                'Access-Control-Allow-Origin' => '*',
+            ];
+            
+            if (request()->header('Range')) {
+                return $this->streamWithRange($filePath, $fileSize, $mimeType, $headers);
+            }
+            
+            $headers['Content-Length'] = $fileSize;
+            
+            return response()->stream(function () use ($filePath) {
+                $handle = fopen($filePath, 'rb');
+                while (!feof($handle)) {
+                    echo fread($handle, 8192);
+                    flush();
+                }
+                fclose($handle);
+            }, 200, $headers);
+            
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+    
+    /**
+     * Handle range requests for video seeking
+     */
+    private function streamWithRange($filePath, $fileSize, $mimeType, $headers)
+    {
+        $range = request()->header('Range');
+        
+        // Parse range header
+        preg_match('/bytes=(\d+)-(\d*)/', $range, $matches);
+        $start = intval($matches[1]);
+        $end = isset($matches[2]) && $matches[2] !== '' ? intval($matches[2]) : $fileSize - 1;
+        
+        // Validate range
+        if ($start > $end || $start > $fileSize - 1 || $end > $fileSize - 1) {
+            return response('', 416)->header('Content-Range', "bytes */{$fileSize}");
+        }
+        
+        $length = $end - $start + 1;
+        
+        $headers['Content-Length'] = $length;
+        $headers['Content-Range'] = "bytes {$start}-{$end}/{$fileSize}";
+        
+        return response()->stream(function () use ($filePath, $start, $length) {
+            $handle = fopen($filePath, 'rb');
+            fseek($handle, $start);
+            $remaining = $length;
+            
+            while ($remaining > 0 && !feof($handle)) {
+                $chunk = fread($handle, min(8192, $remaining));
+                echo $chunk;
+                flush();
+                $remaining -= strlen($chunk);
+            }
+            
+            fclose($handle);
+        }, 206, $headers);
+    }
 }

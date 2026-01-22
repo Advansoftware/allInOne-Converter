@@ -37,12 +37,25 @@ export default api;
 // ============================================
 // Conversion Service
 // ============================================
+export interface ConversionOptions {
+  format?: string;
+  ffmpeg_params?: string;
+}
+
 export const conversionService = {
   getProfiles: () => api.get('/conversion/profiles'),
 
-  upload: (file: File, onProgress?: (progress: number) => void) => {
+  upload: (file: File, options?: ConversionOptions, onProgress?: (progress: number) => void) => {
     const formData = new FormData();
     formData.append('file', file);
+
+    // Add conversion options if provided
+    if (options?.format) {
+      formData.append('format', options.format);
+    }
+    if (options?.ffmpeg_params) {
+      formData.append('ffmpeg_params', options.ffmpeg_params);
+    }
 
     return api.post('/conversion/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
