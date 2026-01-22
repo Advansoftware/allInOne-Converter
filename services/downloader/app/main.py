@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     redis_port: int = 6379
     storage_path: str = "/app/storage"
     converter_service_url: str = "http://converter:8000"
+    pusher_host: str = "websocket"
+    pusher_port: int = 6001
+    pusher_app_id: str = "allone-app"
+    pusher_key: str = "allone-key"
+    pusher_secret: str = "allone-secret"
     
     class Config:
         env_file = ".env"
@@ -78,10 +83,70 @@ def get_job_key(job_id: str) -> str:
     return f"download:job:{job_id}"
 
 
+async def send_websocket_event(job_id: str, status: str, progress: float = 0,
+                                title: str = None, output_path: str = None,
+                                error: str = None, thumbnail: str = None):
+    """Send event to Soketi WebSocket server via HTTP API"""
+    import hashlib
+    import hmac
+    import time
+    
+    try:
+        # Pusher HTTP API format for Soketi
+        channel = "jobs"
+        event = "job.updated"
+        
+        data = {
+            "job_id": job_id,
+            "type": "download",
+            "status": status,
+            "progress": progress,
+            "file_name": title or "",
+            "error": error,
+            "metadata": {
+                "output_path": output_path or "",
+                "thumbnail": thumbnail or ""
+            },
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        }
+        
+        body = json.dumps({
+            "name": event,
+            "channel": channel,
+            "data": json.dumps(data)
+        })
+        
+        # Create auth signature
+        timestamp = str(int(time.time()))
+        body_md5 = hashlib.md5(body.encode()).hexdigest()
+        
+        string_to_sign = f"POST\n/apps/{settings.pusher_app_id}/events\nauth_key={settings.pusher_key}&auth_timestamp={timestamp}&auth_version=1.0&body_md5={body_md5}"
+        signature = hmac.new(
+            settings.pusher_secret.encode(),
+            string_to_sign.encode(),
+            hashlib.sha256
+        ).hexdigest()
+        
+        url = f"http://{settings.pusher_host}:{settings.pusher_port}/apps/{settings.pusher_app_id}/events"
+        params = {
+            "auth_key": settings.pusher_key,
+            "auth_timestamp": timestamp,
+            "auth_version": "1.0",
+            "body_md5": body_md5,
+            "auth_signature": signature
+        }
+        
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(url, params=params, content=body, headers={"Content-Type": "application/json"})
+            
+    except Exception as e:
+        print(f"WebSocket event error: {e}")
+
+
 def update_job_status(job_id: str, status: str, progress: float = 0,
                       title: str = None, output_path: str = None, 
                       error: str = None, thumbnail: str = None):
-    """Update job status in Redis"""
+    """Update job status in Redis and send WebSocket event"""
     job_data = {
         "job_id": job_id,
         "status": status,
@@ -94,8 +159,17 @@ def update_job_status(job_id: str, status: str, progress: float = 0,
     redis_client.hset(get_job_key(job_id), mapping=job_data)
     redis_client.expire(get_job_key(job_id), 86400)  # 24h expiry
     
-    # Publish status update
+    # Publish status update to Redis
     redis_client.publish(f"download:status:{job_id}", json.dumps(job_data))
+    
+    # Send WebSocket event (fire and forget)
+    try:
+        asyncio.create_task(send_websocket_event(
+            job_id, status, progress, title, output_path, error, thumbnail
+        ))
+    except RuntimeError:
+        # No event loop running, skip websocket
+        pass
 
 
 class DownloadProgressHook:
@@ -286,24 +360,26 @@ async def get_video_info(url: str):
 
 
 @app.post("/download")
-async def download(request: DownloadRequest, background_tasks: BackgroundTasks):
-    """Start a download job"""
+async def download(request: DownloadRequest):
+    """Start a download job - returns immediately"""
     job_id = request.job_id or str(uuid.uuid4())
     
     # Validate URL
     if not request.url:
         raise HTTPException(status_code=400, detail="URL is required")
     
-    # Initialize job
+    # Initialize job in Redis FIRST
     update_job_status(job_id, "pending", 0)
     
-    # Start download in background
-    background_tasks.add_task(
-        run_download, 
-        job_id, 
-        request.url, 
-        request.format,
-        request.convert_to
+    # Start download in background using asyncio.create_task
+    # This returns immediately without waiting
+    asyncio.create_task(
+        run_download(
+            job_id, 
+            request.url, 
+            request.format,
+            request.convert_to
+        )
     )
     
     return {"job_id": job_id, "status": "pending"}

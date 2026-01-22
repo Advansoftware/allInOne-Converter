@@ -7,16 +7,12 @@ use App\Http\Controllers\DownloadController;
 use App\Http\Controllers\TorrentController;
 use App\Http\Controllers\StreamController;
 use App\Http\Controllers\QueueController;
+use App\Http\Controllers\MediaController;
 
 /*
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
-|
 */
 
 // Health check
@@ -26,6 +22,16 @@ Route::get('/health', function () {
         'service' => 'api-gateway',
         'timestamp' => now()->toIso8601String(),
     ]);
+});
+
+// ============================================
+// MAIN ENDPOINT - Single entry point for all media
+// ============================================
+Route::prefix('media')->group(function () {
+    Route::post('/submit', [MediaController::class, 'submit']);
+    Route::get('/status/{jobId}', [MediaController::class, 'status']);
+    Route::get('/download/{jobId}', [MediaController::class, 'download']);
+    Route::get('/websocket-config', [MediaController::class, 'websocketConfig']);
 });
 
 // Legacy test route

@@ -1,15 +1,18 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { queueService, conversionService, downloadService, torrentService, QueueItem, JobStatus, TorrentStatus } from '../services/api';
+import websocketService, { JobUpdate } from '../services/websocket';
 
 // ============================================
-// useQueue Hook - Poll queue status
+// useQueue Hook - WebSocket only (no polling)
 // ============================================
-export function useQueue(pollInterval = 2000) {
+export function useQueue(_pollInterval = 5000) {
   const [jobs, setJobs] = useState<QueueItem[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [wsConnected, setWsConnected] = useState(false);
 
+  // Fetch jobs only once on mount
   const fetchJobs = useCallback(async () => {
     try {
       const [jobsRes, statsRes] = await Promise.all([
@@ -26,11 +29,58 @@ export function useQueue(pollInterval = 2000) {
     }
   }, []);
 
+  // Initial fetch only
   useEffect(() => {
     fetchJobs();
-    const interval = setInterval(fetchJobs, pollInterval);
-    return () => clearInterval(interval);
-  }, [fetchJobs, pollInterval]);
+  }, [fetchJobs]);
+
+  // Handle WebSocket updates - NO POLLING
+  useEffect(() => {
+    const unsubscribe = websocketService.onJobUpdate((update: JobUpdate) => {
+      console.log('📨 Job update via WebSocket:', update);
+
+      setJobs(prevJobs => {
+        const existingIndex = prevJobs.findIndex(j => j.job_id === update.job_id);
+
+        const newJob = {
+          job_id: update.job_id,
+          type: update.type as 'conversion' | 'download' | 'torrent',
+          status: update.status as QueueItem['status'],
+          progress: update.progress,
+          output_path: update.metadata?.output_path,
+          error: update.error || undefined,
+          title: existingIndex >= 0
+            ? (prevJobs[existingIndex] as any).title
+            : (update.file_name || undefined),
+          name: existingIndex >= 0
+            ? (prevJobs[existingIndex] as any).name
+            : (update.file_name || undefined),
+          thumbnail: existingIndex >= 0
+            ? (prevJobs[existingIndex] as any).thumbnail
+            : undefined,
+        } as QueueItem;
+
+        if (existingIndex >= 0) {
+          const updated = [...prevJobs];
+          updated[existingIndex] = { ...prevJobs[existingIndex], ...newJob };
+          return updated;
+        } else {
+          return [newJob, ...prevJobs];
+        }
+      });
+    });
+
+    // Track connection status
+    setWsConnected(websocketService.isConnected());
+    const connectionCheck = setInterval(() => {
+      setWsConnected(websocketService.isConnected());
+    }, 5000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(connectionCheck);
+    };
+  }, []);
 
   const removeJob = useCallback(async (jobId: string) => {
     try {
@@ -41,7 +91,7 @@ export function useQueue(pollInterval = 2000) {
     }
   }, []);
 
-  return { jobs, stats, loading, error, refresh: fetchJobs, removeJob };
+  return { jobs, stats, loading, error, refresh: fetchJobs, removeJob, wsConnected };
 }
 
 // ============================================

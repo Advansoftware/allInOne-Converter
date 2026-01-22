@@ -58,11 +58,16 @@ RUN chown -R nobody:nobody /var/www/html /run/nginx /var/log/nginx
 
 WORKDIR /var/www/html
 
+# Copy entrypoint script
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+COPY queue-entrypoint.sh /queue-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh /queue-entrypoint.sh
+
 # Expose port
 EXPOSE 8080
 
-# Start supervisor
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+# Entrypoint
+ENTRYPOINT ["/docker-entrypoint.sh"]
 
 # Healthcheck
 HEALTHCHECK --timeout=10s CMD curl --silent --fail http://127.0.0.1:8080/api/health || exit 1

@@ -11,11 +11,13 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./Project/web:/app
-      - /app/node_modules
     ports:
       - "3000:5173"
     environment:
       - VITE_API_URL=http://localhost:8080
+      - VITE_PUSHER_KEY=allone-key
+      - VITE_PUSHER_HOST=localhost
+      - VITE_PUSHER_PORT=6001
       - CHOKIDAR_USEPOLLING=true
     depends_on:
       - api
@@ -52,6 +54,13 @@ services:
       - DOWNLOADER_SERVICE_URL=http://downloader:8000
       - TORRENT_SERVICE_URL=http://torrent:8000
       - STREAMER_SERVICE_URL=http://streamer:8000
+      - BROADCAST_DRIVER=pusher
+      - PUSHER_APP_ID=allone-app
+      - PUSHER_APP_KEY=allone-key
+      - PUSHER_APP_SECRET=allone-secret
+      - PUSHER_HOST=websocket
+      - PUSHER_PORT=6001
+      - PUSHER_SCHEME=http
     depends_on:
       database:
         condition: service_healthy
@@ -174,7 +183,17 @@ services:
     build:
       context: ./services/api
       dockerfile: Dockerfile
-    command: php artisan queue:work redis --sleep=3 --tries=3 --max-time=3600
+    entrypoint: ["/queue-entrypoint.sh"]
+    command:
+      [
+        "php",
+        "artisan",
+        "queue:work",
+        "redis",
+        "--sleep=3",
+        "--tries=3",
+        "--max-time=3600",
+      ]
     volumes:
       - ./Project/api:/var/www/html
       - shared-storage:/var/www/html/storage/app/public
@@ -194,6 +213,13 @@ services:
       - DOWNLOADER_SERVICE_URL=http://downloader:8000
       - TORRENT_SERVICE_URL=http://torrent:8000
       - STREAMER_SERVICE_URL=http://streamer:8000
+      - BROADCAST_DRIVER=pusher
+      - PUSHER_APP_ID=allone-app
+      - PUSHER_APP_KEY=allone-key
+      - PUSHER_APP_SECRET=allone-secret
+      - PUSHER_HOST=websocket
+      - PUSHER_PORT=6001
+      - PUSHER_SCHEME=http
     depends_on:
       - api
       - redis
@@ -202,7 +228,7 @@ services:
     restart: unless-stopped
 
   # ===========================================
-  # REDIS - Queue & Cache
+  # REDIS - Queue & Cache & Pub/Sub
   # ===========================================
   redis:
     container_name: allone-redis
@@ -217,6 +243,25 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    networks:
+      - allone-network
+    restart: unless-stopped
+
+  # ===========================================
+  # SOKETI - WebSocket Server (Pusher compatible)
+  # ===========================================
+  websocket:
+    container_name: allone-websocket
+    image: quay.io/soketi/soketi:1.6-16-debian
+    ports:
+      - "6001:6001"
+      - "9601:9601"
+    environment:
+      SOKETI_DEBUG: "1"
+      SOKETI_DEFAULT_APP_ID: "allone-app"
+      SOKETI_DEFAULT_APP_KEY: "allone-key"
+      SOKETI_DEFAULT_APP_SECRET: "allone-secret"
+      SOKETI_DEFAULT_APP_ENABLE_CLIENT_MESSAGES: "true"
     networks:
       - allone-network
     restart: unless-stopped

@@ -10,6 +10,14 @@ use Illuminate\Support\Facades\Http;
 class QueueController extends Controller
 {
     /**
+     * Get Redis connection without prefix for microservices jobs
+     */
+    private function redis()
+    {
+        return Redis::connection('jobs');
+    }
+
+    /**
      * Get all jobs in queue
      */
     public function index(Request $request)
@@ -19,11 +27,12 @@ class QueueController extends Controller
         $limit = $request->query('limit', 50);
 
         $jobs = [];
+        $redis = $this->redis();
 
         // Get conversion jobs from Redis
-        $conversionKeys = Redis::keys('conversion:job:*');
+        $conversionKeys = $redis->keys('conversion:job:*');
         foreach ($conversionKeys as $key) {
-            $jobData = Redis::hgetall($key);
+            $jobData = $redis->hgetall($key);
             if ($jobData) {
                 $jobData['type'] = 'conversion';
                 $jobs[] = $jobData;
@@ -31,9 +40,9 @@ class QueueController extends Controller
         }
 
         // Get download jobs from Redis
-        $downloadKeys = Redis::keys('download:job:*');
+        $downloadKeys = $redis->keys('download:job:*');
         foreach ($downloadKeys as $key) {
-            $jobData = Redis::hgetall($key);
+            $jobData = $redis->hgetall($key);
             if ($jobData) {
                 $jobData['type'] = 'download';
                 $jobs[] = $jobData;
@@ -41,9 +50,9 @@ class QueueController extends Controller
         }
 
         // Get torrent jobs from Redis
-        $torrentKeys = Redis::keys('torrent:job:*');
+        $torrentKeys = $redis->keys('torrent:job:*');
         foreach ($torrentKeys as $key) {
-            $jobData = Redis::hgetall($key);
+            $jobData = $redis->hgetall($key);
             if ($jobData) {
                 $jobData['type'] = 'torrent';
                 $jobs[] = $jobData;
@@ -77,22 +86,24 @@ class QueueController extends Controller
      */
     public function show($jobId)
     {
+        $redis = $this->redis();
+
         // Try to find in conversion jobs
-        $jobData = Redis::hgetall("conversion:job:{$jobId}");
+        $jobData = $redis->hgetall("conversion:job:{$jobId}");
         if ($jobData) {
             $jobData['type'] = 'conversion';
             return response()->json($jobData);
         }
 
         // Try download jobs
-        $jobData = Redis::hgetall("download:job:{$jobId}");
+        $jobData = $redis->hgetall("download:job:{$jobId}");
         if ($jobData) {
             $jobData['type'] = 'download';
             return response()->json($jobData);
         }
 
         // Try torrent jobs
-        $jobData = Redis::hgetall("torrent:job:{$jobId}");
+        $jobData = $redis->hgetall("torrent:job:{$jobId}");
         if ($jobData) {
             $jobData['type'] = 'torrent';
             return response()->json($jobData);
@@ -106,10 +117,12 @@ class QueueController extends Controller
      */
     public function destroy($jobId)
     {
+        $redis = $this->redis();
+
         // Try to remove from all job types
-        Redis::del("conversion:job:{$jobId}");
-        Redis::del("download:job:{$jobId}");
-        Redis::del("torrent:job:{$jobId}");
+        $redis->del("conversion:job:{$jobId}");
+        $redis->del("download:job:{$jobId}");
+        $redis->del("torrent:job:{$jobId}");
 
         return response()->json(['status' => 'removed']);
     }
@@ -119,6 +132,8 @@ class QueueController extends Controller
      */
     public function stats()
     {
+        $redis = $this->redis();
+
         $stats = [
             'conversion' => [
                 'pending' => 0,
@@ -141,27 +156,27 @@ class QueueController extends Controller
         ];
 
         // Count conversion jobs
-        $conversionKeys = Redis::keys('conversion:job:*');
+        $conversionKeys = $redis->keys('conversion:job:*');
         foreach ($conversionKeys as $key) {
-            $status = Redis::hget($key, 'status');
+            $status = $redis->hget($key, 'status');
             if (isset($stats['conversion'][$status])) {
                 $stats['conversion'][$status]++;
             }
         }
 
         // Count download jobs
-        $downloadKeys = Redis::keys('download:job:*');
+        $downloadKeys = $redis->keys('download:job:*');
         foreach ($downloadKeys as $key) {
-            $status = Redis::hget($key, 'status');
+            $status = $redis->hget($key, 'status');
             if (isset($stats['download'][$status])) {
                 $stats['download'][$status]++;
             }
         }
 
         // Count torrent jobs
-        $torrentKeys = Redis::keys('torrent:job:*');
+        $torrentKeys = $redis->keys('torrent:job:*');
         foreach ($torrentKeys as $key) {
-            $status = Redis::hget($key, 'status');
+            $status = $redis->hget($key, 'status');
             if (isset($stats['torrent'][$status])) {
                 $stats['torrent'][$status]++;
             }

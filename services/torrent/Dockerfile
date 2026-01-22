@@ -1,22 +1,22 @@
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 
 LABEL Maintainer="AllOne Converter"
 
-# Install system dependencies
+# Install system dependencies including libtorrent
 RUN apt-get update && apt-get install -y --no-install-recommends \
-  build-essential \
-  libboost-system-dev \
-  libboost-python-dev \
-  libssl-dev \
+  python3-libtorrent \
   curl \
   && rm -rf /var/lib/apt/lists/*
+
+# Create symlink for libtorrent to be available in pip's python
+RUN ln -sf /usr/lib/python3/dist-packages/libtorrent*.so /usr/local/lib/python3.11/site-packages/ 2>/dev/null || true
 
 WORKDIR /app
 
 # Copy requirements
 COPY requirements.txt .
 
-# Install Python dependencies
+# Install Python dependencies (without libtorrent since it's installed via apt)
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application
