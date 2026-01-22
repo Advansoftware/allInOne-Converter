@@ -448,6 +448,58 @@ async def cleanup_cache(max_age_hours: int = 24):
     return {"deleted": deleted}
 
 
+@app.get("/transmux")
+async def transmux_video(file_path: str):
+    """Transmux video file to browser-compatible MP4 format (no re-encoding video)
+    Used for MKV and other non-browser-native formats
+    """
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    ext = file_path.split(".")[-1].lower()
+    
+    # For already compatible formats, just stream the file directly
+    if ext in ["mp4", "webm"]:
+        return FileResponse(file_path, media_type=f"video/{ext}")
+    
+    def generate():
+        cmd = [
+            "ffmpeg",
+            "-i", file_path,
+            "-c:v", "copy",  # Copy video stream (no re-encoding)
+            "-c:a", "aac",   # Convert audio to AAC (browser compatible)
+            "-b:a", "192k",
+            "-movflags", "frag_keyframe+empty_moov+faststart",
+            "-f", "mp4",
+            "-"
+        ]
+        
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            bufsize=65536
+        )
+        
+        try:
+            while True:
+                chunk = process.stdout.read(65536)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            process.terminate()
+            process.wait()
+    
+    return StreamingResponse(
+        generate(),
+        media_type="video/mp4",
+        headers={
+            "Access-Control-Allow-Origin": "*",
+        }
+    )
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

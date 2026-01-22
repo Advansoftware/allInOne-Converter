@@ -159,15 +159,13 @@ class TorrentController extends Controller
     }
 
     /**
-     * Remove torrent
+     * Remove torrent and all associated files
      */
     public function remove(Request $request, $jobId)
     {
         try {
-            $deleteFiles = $request->query('delete_files', false);
-            $response = Http::timeout(10)->delete("{$this->torrentUrl}/{$jobId}", [
-                'query' => ['delete_files' => $deleteFiles]
-            ]);
+            // Always remove with files - no option needed
+            $response = Http::timeout(10)->delete("{$this->torrentUrl}/{$jobId}");
 
             return response()->json($response->json());
         } catch (\Exception $e) {
@@ -243,6 +241,41 @@ class TorrentController extends Controller
                 },
                 $statusCode,
                 $responseHeaders
+            );
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Stream torrent file with browser-compatible transcoding
+     */
+    public function streamCompat($jobId, $fileIndex)
+    {
+        try {
+            // This streams transcoded content, so we use chunked transfer
+            $url = "{$this->torrentUrl}/stream-compat/{$jobId}/{$fileIndex}";
+            
+            return response()->stream(
+                function () use ($url) {
+                    $ch = curl_init($url);
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
+                    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 0);
+                    curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($ch, $data) {
+                        echo $data;
+                        flush();
+                        return strlen($data);
+                    });
+                    curl_exec($ch);
+                    curl_close($ch);
+                },
+                200,
+                [
+                    'Content-Type' => 'video/mp4',
+                    'Access-Control-Allow-Origin' => '*',
+                    'Cache-Control' => 'no-cache',
+                ]
             );
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);

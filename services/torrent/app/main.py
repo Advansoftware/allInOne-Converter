@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     storage_path: str = "/app/storage"
     download_path: str = "/app/downloads"
     converter_service_url: str = "http://converter:8000"
+    streamer_service_url: str = "http://streamer:8000"
     
     class Config:
         env_file = ".env"
@@ -147,8 +148,155 @@ def get_session():
     return torrent_session
 
 
-async def monitor_torrent(job_id: str, handle):
+async def monitor_torrent_metadata(job_id: str, handle):
+    """Monitor only until metadata is available, then pause and wait for selection"""
+    while True:
+        try:
+            if not handle.is_valid():
+                break
+            
+            if handle.has_metadata():
+                # Got metadata, pause and set all files to skip
+                handle.pause()
+                info = handle.get_torrent_info()
+                
+                for i in range(info.num_files()):
+                    handle.file_priority(i, 0)
+                
+                files = []
+                for i in range(info.num_files()):
+                    file_info = info.file_at(i)
+                    files.append({
+                        "index": i,
+                        "name": file_info.path,
+                        "size": file_info.size,
+                        "priority": 0,
+                        "progress": 0
+                    })
+                
+                update_job_status(job_id, {
+                    "job_id": job_id,
+                    "status": "waiting_selection",
+                    "progress": 0,
+                    "name": info.name(),
+                    "files": files,
+                    "waiting_selection": "true"
+                })
+                break
+            
+            await asyncio.sleep(1)
+            
+        except Exception as e:
+            update_job_status(job_id, {
+                "job_id": job_id,
+                "status": "failed",
+                "progress": 0,
+                "error": str(e)
+            })
+            break
+
+
+def is_media_file(filename: str) -> bool:
+    """Check if file is a media file (video/audio)"""
+    ext = filename.split(".")[-1].lower()
+    media_exts = ["mp4", "mkv", "avi", "mov", "webm", "flv", "wmv", "m4v",
+                  "mp3", "flac", "wav", "aac", "ogg", "m4a", "wma"]
+    return ext in media_exts
+
+
+def get_first_media_file(job_id: str, files: list) -> Optional[str]:
+    """Get the first media file from the torrent"""
+    download_dir = os.path.join(settings.download_path, job_id)
+    
+    for f in files:
+        if is_media_file(f.get("name", "")):
+            file_path = os.path.join(download_dir, f["name"])
+            if os.path.exists(file_path):
+                return file_path
+    return None
+
+
+async def on_torrent_complete(job_id: str, handle, convert_to: str = None):
+    """Handle torrent completion - generate thumbnail and start conversion"""
+    try:
+        info = handle.get_torrent_info()
+        download_dir = os.path.join(settings.download_path, job_id)
+        
+        # Get files list
+        files = []
+        for i in range(info.num_files()):
+            if handle.file_priority(i) > 0:  # Only selected files
+                file_info = info.file_at(i)
+                files.append({
+                    "index": i,
+                    "name": file_info.path,
+                    "size": file_info.size
+                })
+        
+        # Find first media file for thumbnail
+        first_media = get_first_media_file(job_id, files)
+        
+        if first_media:
+            # Generate thumbnail using streamer service
+            await generate_thumbnail_via_streamer(job_id, first_media)
+        
+        # Start conversion if configured
+        if convert_to and first_media:
+            await start_conversion(job_id, first_media, convert_to)
+                
+    except Exception as e:
+        print(f"on_torrent_complete error: {e}")
+
+
+async def generate_thumbnail_via_streamer(job_id: str, file_path: str, time: str = "00:00:10"):
+    """Generate thumbnail using the streamer service"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{settings.streamer_service_url}/thumbnail",
+                params={"file_path": file_path, "time": time},
+                timeout=30
+            )
+            if response.status_code == 200:
+                # Save thumbnail locally with job_id name
+                thumbnail_dir = "/app/storage/thumbnails"
+                os.makedirs(thumbnail_dir, exist_ok=True)
+                thumbnail_path = os.path.join(thumbnail_dir, f"{job_id}.jpg")
+                
+                async with aiofiles.open(thumbnail_path, 'wb') as f:
+                    await f.write(response.content)
+                
+                update_job_status(job_id, {"thumbnail": f"/api/thumbnails/{job_id}.jpg"})
+                print(f"Thumbnail generated for {job_id}")
+    except Exception as e:
+        print(f"Thumbnail generation failed: {e}")
+
+
+async def start_conversion(job_id: str, input_path: str, output_format: str):
+    """Start conversion using the converter service"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{settings.converter_service_url}/convert",
+                json={
+                    "job_id": job_id,
+                    "input_path": input_path,
+                    "output_format": output_format,
+                    "source": "torrent"
+                },
+                timeout=30
+            )
+            if response.status_code == 200:
+                update_job_status(job_id, {"status": "converting"})
+                print(f"Conversion started for {job_id}")
+    except Exception as e:
+        print(f"Conversion start failed: {e}")
+
+
+async def monitor_torrent(job_id: str, handle, convert_to: str = None):
     """Monitor torrent download progress"""
+    thumbnail_generated = False
+    
     while True:
         try:
             if not handle.is_valid():
@@ -192,21 +340,37 @@ async def monitor_torrent(job_id: str, handle):
             }
             
             torrent_status = state_map.get(status.state, "unknown")
+            progress = status.progress * 100
             
             update_job_status(job_id, {
                 "job_id": job_id,
                 "status": torrent_status,
-                "progress": status.progress * 100,
+                "progress": progress,
                 "download_rate": status.download_rate,
                 "upload_rate": status.upload_rate,
                 "num_peers": status.num_peers,
                 "num_seeds": status.num_seeds,
                 "name": info.name() if info else "Loading metadata...",
                 "files": files,
-                "error": ""
+                "error": "",
+                "convert_to": convert_to or ""
             })
             
+            # Generate thumbnail early when we have enough data (>10%)
+            if not thumbnail_generated and progress > 10 and info:
+                # Find first media file
+                download_dir = os.path.join(settings.download_path, job_id)
+                for f in files:
+                    if is_media_file(f.get("name", "")) and f.get("priority", 0) > 0:
+                        file_path = os.path.join(download_dir, f["name"])
+                        if os.path.exists(file_path) and os.path.getsize(file_path) > 1024 * 1024:  # >1MB
+                            asyncio.create_task(generate_thumbnail_via_streamer(job_id, file_path, "00:00:05"))
+                            thumbnail_generated = True
+                            break
+            
             if status.state in [lt.torrent_status.finished, lt.torrent_status.seeding]:
+                # Torrent completed - generate thumbnail and start conversion if configured
+                await on_torrent_complete(job_id, handle, convert_to)
                 break
             
             await asyncio.sleep(1)
@@ -222,7 +386,7 @@ async def monitor_torrent(job_id: str, handle):
 
 
 async def add_torrent_from_magnet(job_id: str, magnet_url: str):
-    """Add torrent from magnet URL"""
+    """Add torrent from magnet URL - starts paused waiting for file selection"""
     session = get_session()
     
     if not session:
@@ -238,6 +402,10 @@ async def add_torrent_from_magnet(job_id: str, magnet_url: str):
         params.save_path = os.path.join(settings.download_path, job_id)
         os.makedirs(params.save_path, exist_ok=True)
         
+        # Add torrent but start paused
+        params.flags |= lt.torrent_flags.paused
+        params.flags |= lt.torrent_flags.auto_managed
+        
         handle = session.add_torrent(params)
         active_torrents[job_id] = handle
         
@@ -246,11 +414,12 @@ async def add_torrent_from_magnet(job_id: str, magnet_url: str):
             "status": "metadata",
             "progress": 0,
             "name": "Loading metadata...",
-            "files": []
+            "files": [],
+            "waiting_selection": "true"
         })
         
-        # Start monitoring
-        asyncio.create_task(monitor_torrent(job_id, handle))
+        # Start metadata monitoring only - will pause after getting metadata
+        asyncio.create_task(monitor_torrent_metadata(job_id, handle))
         
     except Exception as e:
         update_job_status(job_id, {
@@ -261,7 +430,7 @@ async def add_torrent_from_magnet(job_id: str, magnet_url: str):
 
 
 async def add_torrent_from_file(job_id: str, torrent_path: str):
-    """Add torrent from .torrent file"""
+    """Add torrent from .torrent file - starts paused waiting for file selection"""
     session = get_session()
     
     if not session:
@@ -278,11 +447,17 @@ async def add_torrent_from_file(job_id: str, torrent_path: str):
         save_path = os.path.join(settings.download_path, job_id)
         os.makedirs(save_path, exist_ok=True)
         
+        # Add torrent but paused and with all files set to skip (priority 0)
         handle = session.add_torrent({
             'ti': info,
-            'save_path': save_path
+            'save_path': save_path,
+            'flags': lt.torrent_flags.paused | lt.torrent_flags.auto_managed
         })
         active_torrents[job_id] = handle
+        
+        # Set all files to NOT download (priority 0) until user selects
+        for i in range(info.num_files()):
+            handle.file_priority(i, 0)
         
         files = []
         for i in range(info.num_files()):
@@ -291,20 +466,20 @@ async def add_torrent_from_file(job_id: str, torrent_path: str):
                 "index": i,
                 "name": file_info.path,
                 "size": file_info.size,
-                "priority": 4,
+                "priority": 0,
                 "progress": 0
             })
         
         update_job_status(job_id, {
             "job_id": job_id,
-            "status": "downloading",
+            "status": "waiting_selection",
             "progress": 0,
             "name": info.name(),
-            "files": files
+            "files": files,
+            "waiting_selection": "true"
         })
         
-        # Start monitoring
-        asyncio.create_task(monitor_torrent(job_id, handle))
+        # Don't start monitoring yet - wait for file selection
         
     except Exception as e:
         update_job_status(job_id, {
@@ -497,7 +672,7 @@ async def get_status(job_id: str):
 
 @app.post("/select-files")
 async def select_files(request: FileSelectRequest, background_tasks: BackgroundTasks):
-    """Select which files to download from torrent"""
+    """Select which files to download from torrent and START downloading"""
     if request.job_id not in active_torrents:
         raise HTTPException(status_code=404, detail="Torrent not found")
     
@@ -508,14 +683,27 @@ async def select_files(request: FileSelectRequest, background_tasks: BackgroundT
     
     info = handle.get_torrent_info()
     
-    # Set file priorities
+    # Set file priorities - only selected files will download
     for i in range(info.num_files()):
         if i in request.file_indices:
             handle.file_priority(i, 4)  # High priority
         else:
             handle.file_priority(i, 0)  # Skip
     
-    return {"status": "ok", "selected": request.file_indices}
+    # Resume the torrent to start downloading
+    handle.resume()
+    
+    # Update status
+    update_job_status(request.job_id, {
+        "status": "downloading",
+        "waiting_selection": "",
+        "convert_to": request.convert_to or ""
+    })
+    
+    # Start monitoring the download progress
+    asyncio.create_task(monitor_torrent(request.job_id, handle, request.convert_to))
+    
+    return {"status": "downloading", "selected": request.file_indices}
 
 
 @app.post("/pause/{job_id}")
@@ -547,18 +735,21 @@ async def resume_torrent(job_id: str):
 
 
 @app.delete("/{job_id}")
-async def remove_torrent(job_id: str, delete_files: bool = False):
-    """Remove torrent"""
+async def remove_torrent(job_id: str):
+    """Remove torrent and all associated files"""
+    import shutil
+    
     if job_id in active_torrents:
         session = get_session()
         handle = active_torrents[job_id]
-        
-        if delete_files:
-            session.remove_torrent(handle, lt.options_t.delete_files)
-        else:
-            session.remove_torrent(handle)
-        
+        # Always delete files
+        session.remove_torrent(handle, lt.options_t.delete_files)
         del active_torrents[job_id]
+    
+    # Also delete download directory if exists
+    download_dir = os.path.join(settings.download_path, job_id)
+    if os.path.exists(download_dir):
+        shutil.rmtree(download_dir, ignore_errors=True)
     
     redis_client.delete(get_job_key(job_id))
     
@@ -589,18 +780,43 @@ async def list_files(job_id: str):
 
 @app.get("/list")
 async def list_torrents():
-    """List all active torrents"""
+    """List all torrents (active and completed)"""
     torrents = []
+    seen_ids = set()
     
+    # First, get active torrents from memory
     for job_id in active_torrents:
         job_data = redis_client.hgetall(get_job_key(job_id))
         if job_data:
+            seen_ids.add(job_id)
             torrents.append({
                 "job_id": job_id,
                 "name": job_data.get("name", "Unknown"),
                 "status": job_data.get("status", "unknown"),
-                "progress": float(job_data.get("progress", 0))
+                "progress": float(job_data.get("progress", 0)),
+                "download_rate": float(job_data.get("download_rate", 0)),
+                "upload_rate": float(job_data.get("upload_rate", 0)),
+                "num_peers": int(job_data.get("num_peers", 0)),
+                "num_seeds": int(job_data.get("num_seeds", 0)),
             })
+    
+    # Also scan Redis for any completed torrents not in active_torrents
+    # This ensures completed torrents remain visible
+    for key in redis_client.scan_iter(match="torrent:job:*"):
+        job_id = key.replace("torrent:job:", "")
+        if job_id not in seen_ids:
+            job_data = redis_client.hgetall(key)
+            if job_data:
+                torrents.append({
+                    "job_id": job_id,
+                    "name": job_data.get("name", "Unknown"),
+                    "status": job_data.get("status", "unknown"),
+                    "progress": float(job_data.get("progress", 0)),
+                    "download_rate": 0,
+                    "upload_rate": 0,
+                    "num_peers": 0,
+                    "num_seeds": 0,
+                })
     
     return {"torrents": torrents}
 
@@ -708,6 +924,64 @@ async def stream_torrent_file(job_id: str, file_index: int, request: Request):
                 "Content-Length": str(file_size),
             }
         )
+
+
+@app.get("/stream-compat/{job_id}/{file_index}")
+async def stream_torrent_file_compat(job_id: str, file_index: int, request: Request):
+    """Stream a file with browser-compatible transcoding via streamer service
+    Redirects to streamer's transmux endpoint for MKV and other formats
+    """
+    # Get job info from Redis
+    job_data = redis_client.hgetall(get_job_key(job_id))
+    if not job_data:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Get files list
+    files = []
+    if job_data.get("files"):
+        try:
+            files = json.loads(job_data["files"])
+        except:
+            pass
+    
+    if file_index >= len(files):
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    file_info = files[file_index]
+    file_name = file_info.get("name", "")
+    
+    # Construct file path
+    download_dir = os.path.join(settings.download_path, job_id)
+    file_path = os.path.join(download_dir, file_name)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+    
+    ext = file_name.split(".")[-1].lower()
+    
+    # For browser-compatible formats, just stream directly
+    if ext in ["mp4", "webm"]:
+        # Use normal stream endpoint
+        return await stream_torrent_file(job_id, file_index, request)
+    
+    # For MKV and other formats, proxy to streamer service
+    async def proxy_stream():
+        async with httpx.AsyncClient(timeout=None) as client:
+            async with client.stream(
+                "GET",
+                f"{settings.streamer_service_url}/transmux",
+                params={"file_path": file_path}
+            ) as response:
+                async for chunk in response.aiter_bytes(65536):
+                    yield chunk
+    
+    return StreamingResponse(
+        proxy_stream(),
+        media_type="video/mp4",
+        headers={
+            "Access-Control-Allow-Origin": "*",
+        }
+    )
 
 
 if __name__ == "__main__":

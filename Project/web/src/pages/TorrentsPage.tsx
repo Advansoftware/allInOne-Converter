@@ -77,14 +77,36 @@ const formatSpeed = (bytesPerSec: number): string => {
 
 const getFileIcon = (filename: string) => {
   const ext = filename.split(".").pop()?.toLowerCase() || "";
-  const videoExts = ["mp4", "mkv", "avi", "mov", "webm", "flv", "wmv"];
-  const audioExts = ["mp3", "flac", "wav", "aac", "ogg", "m4a"];
+  const videoExts = ["mp4", "mkv", "avi", "mov", "webm", "flv", "wmv", "m4v"];
+  const audioExts = ["mp3", "flac", "wav", "aac", "ogg", "m4a", "wma"];
 
   if (videoExts.includes(ext))
     return <VideoFileIcon sx={{ color: "#FF0000" }} />;
   if (audioExts.includes(ext))
     return <AudioFileIcon sx={{ color: "#4CAF50" }} />;
   return <InsertDriveFileIcon sx={{ color: "#9E9E9E" }} />;
+};
+
+const isMediaFile = (filename: string): boolean => {
+  const ext = filename.split(".").pop()?.toLowerCase() || "";
+  const mediaExts = [
+    "mp4",
+    "mkv",
+    "avi",
+    "mov",
+    "webm",
+    "flv",
+    "wmv",
+    "m4v",
+    "mp3",
+    "flac",
+    "wav",
+    "aac",
+    "ogg",
+    "m4a",
+    "wma",
+  ];
+  return mediaExts.includes(ext);
 };
 
 const getStatusColor = (status: string) => {
@@ -99,6 +121,10 @@ const getStatusColor = (status: string) => {
       return "error";
     case "metadata":
       return "secondary";
+    case "waiting_selection":
+      return "warning";
+    case "converting":
+      return "info";
     default:
       return "default";
   }
@@ -120,6 +146,10 @@ const getStatusLabel = (status: string) => {
       return "Verificando...";
     case "allocating":
       return "Alocando...";
+    case "waiting_selection":
+      return "Aguardando seleção";
+    case "converting":
+      return "Convertendo...";
     default:
       return status;
   }
@@ -580,7 +610,7 @@ const TorrentsPage: React.FC = () => {
           jobId={previewJob.id}
           name={previewJob.name}
           status="completed"
-          customStreamUrl={`${apiBaseUrl}/api/torrent/stream/${previewJob.id}/${previewJob.fileIndex}`}
+          customStreamUrl={`${apiBaseUrl}/api/torrent/stream-compat/${previewJob.id}/${previewJob.fileIndex}`}
         />
       )}
     </Box>
@@ -1053,7 +1083,7 @@ const TorrentFilesDialog: React.FC<TorrentFilesDialogProps> = ({
                       gap: 0.5,
                     }}
                   >
-                    {file.progress > 10 && (
+                    {file.progress > 10 && isMediaFile(file.name) && (
                       <Tooltip title="Preview">
                         <IconButton
                           size="small"
@@ -1064,7 +1094,12 @@ const TorrentFilesDialog: React.FC<TorrentFilesDialogProps> = ({
                       </Tooltip>
                     )}
                     <Tooltip title="Converter">
-                      <IconButton size="small" disabled={file.progress < 100}>
+                      <IconButton
+                        size="small"
+                        disabled={
+                          file.progress < 100 || !isMediaFile(file.name)
+                        }
+                      >
                         <TransformIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>

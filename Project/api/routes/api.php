@@ -72,6 +72,9 @@ Route::prefix('torrent')->group(function () {
     // Stream torrent file (must be after /files to avoid conflict)
     Route::get('/stream/{jobId}/{fileIndex}', [TorrentController::class, 'stream'])
         ->where('fileIndex', '[0-9]+');
+    // Browser-compatible stream (transcodes MKV to MP4)
+    Route::get('/stream-compat/{jobId}/{fileIndex}', [TorrentController::class, 'streamCompat'])
+        ->where('fileIndex', '[0-9]+');
 });
 
 // Stream routes

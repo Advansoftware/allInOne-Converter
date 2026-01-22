@@ -110,7 +110,8 @@ const TorrentDialog: React.FC<TorrentDialogProps> = ({
     data: string | File;
   } | null>(null);
 
-  const { addMagnet, addFile, parseFile, parseMagnet } = useTorrent();
+  const { addMagnet, addFile, parseFile, parseMagnet, selectFiles } =
+    useTorrent();
 
   const {
     getRootProps,
@@ -179,6 +180,24 @@ const TorrentDialog: React.FC<TorrentDialogProps> = ({
       }
 
       if (result) {
+        // If we have selected files, call selectFiles to start download
+        // This is where the actual download begins
+        if (selectedFiles.length > 0) {
+          await selectFiles(
+            result.job_id,
+            selectedFiles,
+            options.outputFormat || convertProfile || undefined,
+          );
+        } else if (parsedInfo?.files) {
+          // If no files selected but we have a file list, select all
+          const allIndices = parsedInfo.files.map((_: any, i: number) => i);
+          await selectFiles(
+            result.job_id,
+            allIndices,
+            options.outputFormat || convertProfile || undefined,
+          );
+        }
+
         onTorrentAdded(result.job_id, parsedInfo?.name || "Torrent");
         handleClose();
       }
