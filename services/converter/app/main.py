@@ -7,6 +7,7 @@ import uuid
 import asyncio
 import subprocess
 import json
+from datetime import datetime, timezone
 from typing import Optional
 from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,12 +16,18 @@ from pydantic import BaseModel
 from pydantic_settings import BaseSettings
 import redis
 import aiofiles
+import pusher
 
 
 class Settings(BaseSettings):
     redis_host: str = "redis"
     redis_port: int = 6379
     storage_path: str = "/app/storage"
+    pusher_app_id: str = "allone-app"
+    pusher_key: str = "allone-key"
+    pusher_secret: str = "allone-secret"
+    pusher_host: str = "websocket"
+    pusher_port: int = 6001
     
     class Config:
         env_file = ".env"
@@ -43,6 +50,16 @@ redis_client = redis.Redis(
     host=settings.redis_host,
     port=settings.redis_port,
     decode_responses=True
+)
+
+# Pusher client for broadcasting
+pusher_client = pusher.Pusher(
+    app_id=settings.pusher_app_id,
+    key=settings.pusher_key,
+    secret=settings.pusher_secret,
+    host=settings.pusher_host,
+    port=settings.pusher_port,
+    ssl=False
 )
 
 
@@ -104,10 +121,39 @@ def get_job_key(job_id: str) -> str:
     return f"conversion:job:{job_id}"
 
 
+def broadcast_job_update(job_id: str, status: str, progress: float = 0,
+                         file_name: str = None, error: str = None,
+                         thumbnail: str = None, output_path: str = None):
+    """Broadcast job update via Pusher/Soketi"""
+    try:
+        # Convert thumbnail path to URL if it exists
+        thumbnail_url = None
+        if thumbnail:
+            filename = os.path.basename(thumbnail)
+            thumbnail_url = f"http://localhost:8080/api/thumbnails/{filename}"
+        
+        event_data = {
+            "job_id": job_id,
+            "type": "conversion",
+            "status": status,
+            "progress": int(progress),
+            "file_name": file_name,
+            "error": error,
+            "metadata": {
+                "thumbnail": thumbnail_url,
+                "output_path": output_path
+            } if thumbnail_url or output_path else None,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        pusher_client.trigger('jobs', 'job.updated', event_data)
+    except Exception as e:
+        print(f"Failed to broadcast job update: {e}")
+
+
 def update_job_status(job_id: str, status: str, progress: float = 0, 
                       output_path: str = None, error: str = None,
                       thumbnail: str = None, title: str = None):
-    """Update job status in Redis"""
+    """Update job status in Redis and broadcast via WebSocket"""
     job_data = {
         "job_id": job_id,
         "status": status,
@@ -125,8 +171,19 @@ def update_job_status(job_id: str, status: str, progress: float = 0,
     redis_client.hset(get_job_key(job_id), mapping=job_data)
     redis_client.expire(get_job_key(job_id), 86400)  # 24h expiry
     
-    # Publish status update
+    # Publish status update to Redis (for backward compatibility)
     redis_client.publish(f"conversion:status:{job_id}", json.dumps(job_data))
+    
+    # Broadcast via Pusher/WebSocket for real-time updates
+    broadcast_job_update(
+        job_id=job_id,
+        status=status,
+        progress=progress,
+        file_name=title,
+        error=error,
+        thumbnail=thumbnail,
+        output_path=output_path
+    )
 
 
 def get_video_duration(input_path: str) -> float:
@@ -197,19 +254,26 @@ async def generate_thumbnail_for_job(job_id: str, input_path: str) -> str:
 
 
 async def run_conversion(job_id: str, input_path: str, output_path: str, 
-                         ffmpeg_params: str):
+                         ffmpeg_params: str, title: str = None):
     """Run FFmpeg conversion with progress tracking"""
-    update_job_status(job_id, "processing", 0)
+    update_job_status(job_id, "processing", 0, title=title)
     
     # Generate thumbnail first
     thumbnail_path = await generate_thumbnail_for_job(job_id, input_path)
     if thumbnail_path:
-        # Update job with thumbnail and publish update
+        # Update job with thumbnail and broadcast update
         redis_client.hset(get_job_key(job_id), "thumbnail", thumbnail_path)
-        # Publish thumbnail update so WebSocket relay can forward it
         job_data = redis_client.hgetall(get_job_key(job_id))
         job_data["thumbnail"] = thumbnail_path
         redis_client.publish(f"conversion:status:{job_id}", json.dumps(job_data))
+        # Broadcast thumbnail update via WebSocket
+        broadcast_job_update(
+            job_id=job_id,
+            status="processing",
+            progress=0,
+            file_name=title,
+            thumbnail=thumbnail_path
+        )
     
     duration = get_video_duration(input_path)
     
@@ -296,6 +360,14 @@ async def convert(request: ConversionRequest, background_tasks: BackgroundTasks)
     output_filename = f"{input_name}_{job_id}.{extension}"
     output_path = os.path.join(settings.storage_path, "converted", output_filename)
     
+    # Extract original filename for title
+    original_filename = os.path.basename(request.input_path)
+    # Remove job_id prefix if present
+    if "_" in original_filename:
+        parts = original_filename.split("_", 1)
+        if len(parts) > 1:
+            original_filename = parts[1]
+    
     # Ensure output directory exists
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
@@ -307,11 +379,11 @@ async def convert(request: ConversionRequest, background_tasks: BackgroundTasks)
         output_path = os.path.join(hls_dir, "playlist.m3u8")
         params = f"-c:v libx264 -c:a aac -f hls -hls_time 4 -hls_list_size 0 -hls_segment_filename {segment_path}"
     
-    # Initialize job
-    update_job_status(job_id, "pending", 0)
+    # Initialize job with title
+    update_job_status(job_id, "pending", 0, title=original_filename)
     
     # Start conversion in background
-    background_tasks.add_task(run_conversion, job_id, request.input_path, output_path, params)
+    background_tasks.add_task(run_conversion, job_id, request.input_path, output_path, params, original_filename)
     
     return {"job_id": job_id, "status": "pending"}
 
