@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Box,
   Typography,
@@ -28,6 +28,9 @@ import {
   Tabs,
   Tab,
   Checkbox,
+  Select,
+  InputLabel,
+  FormControl,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
@@ -36,6 +39,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import FolderIcon from "@mui/icons-material/Folder";
 import CloudDownloadIcon from "@mui/icons-material/CloudDownload";
+import DownloadIcon from "@mui/icons-material/Download";
 import SpeedIcon from "@mui/icons-material/Speed";
 import PeopleIcon from "@mui/icons-material/People";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -49,6 +53,7 @@ import TransformIcon from "@mui/icons-material/Transform";
 import { useDropzone } from "react-dropzone";
 import { torrentService, TorrentFile } from "../services/api";
 import VideoPreviewDialog from "../components/VideoPreviewDialog";
+import websocketService from "../services/websocket";
 
 interface TorrentJob {
   job_id: string;
@@ -170,17 +175,12 @@ const TorrentsPage: React.FC = () => {
     name: string;
     fileIndex: number;
   } | null>(null);
+  const torrentsRef = useRef<TorrentJob[]>([]);
 
   const apiBaseUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
-  // Polling for torrent status
-  useEffect(() => {
-    loadTorrents();
-    const interval = setInterval(loadTorrents, 2000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadTorrents = async () => {
+  // Load initial torrents data
+  const loadTorrents = useCallback(async () => {
     try {
       const response = await torrentService.list();
       const torrentList = response.data.torrents || [];
@@ -198,12 +198,52 @@ const TorrentsPage: React.FC = () => {
       );
 
       setTorrents(detailedTorrents);
+      torrentsRef.current = detailedTorrents;
       setLoading(false);
     } catch (err) {
       console.error("Failed to load torrents:", err);
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Initial load and WebSocket subscription
+  useEffect(() => {
+    loadTorrents();
+
+    // Subscribe to WebSocket updates for torrents
+    const unsubscribe = websocketService.onJobUpdate((update) => {
+      if (update.type !== "torrent") return;
+
+      setTorrents((prev) => {
+        const index = prev.findIndex((t) => t.job_id === update.job_id);
+        if (index === -1) {
+          // New torrent, reload list
+          loadTorrents();
+          return prev;
+        }
+
+        // Update existing torrent with all available data
+        const updated = [...prev];
+        const metadata = update.metadata || {};
+        updated[index] = {
+          ...updated[index],
+          status: update.status,
+          progress: update.progress,
+          name: update.file_name || updated[index].name,
+          download_rate: metadata.download_rate ?? updated[index].download_rate,
+          upload_rate: metadata.upload_rate ?? updated[index].upload_rate,
+          num_peers: metadata.num_peers ?? updated[index].num_peers,
+          num_seeds: metadata.num_seeds ?? updated[index].num_seeds,
+          files: metadata.files ?? updated[index].files,
+        };
+        return updated;
+      });
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [loadTorrents]);
 
   const handlePause = async (jobId: string) => {
     try {
@@ -599,6 +639,7 @@ const TorrentsPage: React.FC = () => {
               fileIndex: file.index,
             });
           }}
+          onRefresh={loadTorrents}
         />
       )}
 
@@ -978,6 +1019,7 @@ interface TorrentFilesDialogProps {
   onClose: () => void;
   torrent: TorrentJob;
   onPreview: (file: TorrentFile) => void;
+  onRefresh?: () => void;
 }
 
 const TorrentFilesDialog: React.FC<TorrentFilesDialogProps> = ({
@@ -985,7 +1027,86 @@ const TorrentFilesDialog: React.FC<TorrentFilesDialogProps> = ({
   onClose,
   torrent,
   onPreview,
+  onRefresh,
 }) => {
+  const apiBaseUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
+  const isWaitingSelection = torrent.status === "waiting_selection";
+
+  // State for file selection (when waiting_selection)
+  const [selectedFiles, setSelectedFiles] = useState<number[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [convertTo, setConvertTo] = useState<string>("");
+
+  // Available conversion formats
+  const conversionFormats = [
+    { value: "", label: "Sem conversão (manter original)" },
+    { value: "mp4", label: "MP4 (H.264)" },
+    { value: "mp4_h265", label: "MP4 (H.265/HEVC)" },
+    { value: "webm", label: "WebM (VP9)" },
+    { value: "mp3", label: "MP3 (Áudio)" },
+    { value: "aac", label: "AAC (Áudio)" },
+  ];
+
+  // Initialize selected files when dialog opens
+  useEffect(() => {
+    if (isWaitingSelection && torrent.files) {
+      // By default select all media files
+      const mediaIndices = torrent.files
+        .filter((f) => isMediaFile(f.name))
+        .map((f) => f.index);
+      setSelectedFiles(
+        mediaIndices.length > 0
+          ? mediaIndices
+          : torrent.files.map((f) => f.index),
+      );
+    }
+  }, [isWaitingSelection, torrent.files]);
+
+  const handleToggleFile = (index: number) => {
+    setSelectedFiles((prev) =>
+      prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index],
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (torrent.files) {
+      if (selectedFiles.length === torrent.files.length) {
+        setSelectedFiles([]);
+      } else {
+        setSelectedFiles(torrent.files.map((f) => f.index));
+      }
+    }
+  };
+
+  const handleStartDownload = async () => {
+    if (selectedFiles.length === 0) {
+      setError("Selecione pelo menos um arquivo");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Pass conversion format if selected
+      await torrentService.selectFiles(
+        torrent.job_id,
+        selectedFiles,
+        convertTo || undefined,
+      );
+      onRefresh?.();
+      onClose();
+    } catch (err: any) {
+      console.error("Failed to start download:", err);
+      setError(
+        err.response?.data?.detail || err.message || "Erro ao iniciar download",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Dialog
       open={open}
@@ -1006,30 +1127,112 @@ const TorrentFilesDialog: React.FC<TorrentFilesDialogProps> = ({
           <Box>
             <Typography variant="h6">{torrent.name}</Typography>
             <Typography variant="caption" color="text.secondary">
-              {torrent.files?.length || 0} arquivo(s) •{" "}
-              {torrent.progress.toFixed(1)}% concluído
+              {torrent.files?.length || 0} arquivo(s)
+              {isWaitingSelection
+                ? ` • ${selectedFiles.length} selecionado(s)`
+                : ` • ${torrent.progress.toFixed(1)}% concluído`}
             </Typography>
           </Box>
         </Box>
       </DialogTitle>
 
       <DialogContent sx={{ p: 0 }}>
+        {error && (
+          <Alert severity="error" sx={{ m: 2 }}>
+            {error}
+          </Alert>
+        )}
+
+        {isWaitingSelection && (
+          <Alert severity="info" sx={{ m: 2, mb: 0 }}>
+            Selecione os arquivos que deseja baixar e clique em "Iniciar
+            Download"
+          </Alert>
+        )}
+
+        {isWaitingSelection && (
+          <Box sx={{ px: 2, pt: 2 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel sx={{ color: "text.secondary" }}>
+                Converter para
+              </InputLabel>
+              <Select
+                value={convertTo}
+                label="Converter para"
+                onChange={(e) => setConvertTo(e.target.value)}
+                sx={{
+                  color: "#fff",
+                  "& .MuiOutlinedInput-notchedOutline": {
+                    borderColor: "rgba(255,255,255,0.2)",
+                  },
+                  "&:hover .MuiOutlinedInput-notchedOutline": {
+                    borderColor: "rgba(255,0,0,0.5)",
+                  },
+                  "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                    borderColor: "#FF0000",
+                  },
+                }}
+              >
+                {conversionFormats.map((format) => (
+                  <MenuItem key={format.value} value={format.value}>
+                    {format.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+        )}
+
         <Table>
           <TableHead>
             <TableRow>
+              {isWaitingSelection && (
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    checked={torrent.files?.length === selectedFiles.length}
+                    indeterminate={
+                      selectedFiles.length > 0 &&
+                      selectedFiles.length < (torrent.files?.length || 0)
+                    }
+                    onChange={handleSelectAll}
+                    sx={{
+                      color: "#FF0000",
+                      "&.Mui-checked": { color: "#FF0000" },
+                    }}
+                  />
+                </TableCell>
+              )}
               <TableCell sx={{ color: "text.secondary" }}>Arquivo</TableCell>
               <TableCell sx={{ color: "text.secondary" }} align="right">
                 Tamanho
               </TableCell>
-              <TableCell sx={{ color: "text.secondary" }}>Progresso</TableCell>
-              <TableCell sx={{ color: "text.secondary" }} align="right">
-                Ações
-              </TableCell>
+              {!isWaitingSelection && (
+                <>
+                  <TableCell sx={{ color: "text.secondary" }}>
+                    Progresso
+                  </TableCell>
+                  <TableCell sx={{ color: "text.secondary" }} align="right">
+                    Ações
+                  </TableCell>
+                </>
+              )}
             </TableRow>
           </TableHead>
           <TableBody>
             {torrent.files?.map((file) => (
               <TableRow key={file.index} hover>
+                {isWaitingSelection && (
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      checked={selectedFiles.includes(file.index)}
+                      onChange={() => handleToggleFile(file.index)}
+                      sx={{
+                        color: "#FF0000",
+                        "&.Mui-checked": { color: "#FF0000" },
+                      }}
+                    />
+                  </TableCell>
+                )}
                 <TableCell>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     {getFileIcon(file.name)}
@@ -1043,68 +1246,91 @@ const TorrentFilesDialog: React.FC<TorrentFilesDialogProps> = ({
                     {formatBytes(file.size)}
                   </Typography>
                 </TableCell>
-                <TableCell>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                      width: 120,
-                    }}
-                  >
-                    <LinearProgress
-                      variant="determinate"
-                      value={file.progress}
-                      sx={{
-                        flex: 1,
-                        height: 4,
-                        borderRadius: 2,
-                        backgroundColor: "rgba(255,255,255,0.1)",
-                        "& .MuiLinearProgress-bar": {
-                          backgroundColor:
-                            file.progress === 100 ? "#4CAF50" : "#FF0000",
-                        },
-                      }}
-                    />
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ minWidth: 35 }}
-                    >
-                      {file.progress.toFixed(0)}%
-                    </Typography>
-                  </Box>
-                </TableCell>
-                <TableCell align="right">
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "flex-end",
-                      gap: 0.5,
-                    }}
-                  >
-                    {file.progress > 10 && isMediaFile(file.name) && (
-                      <Tooltip title="Preview">
-                        <IconButton
-                          size="small"
-                          onClick={() => onPreview(file)}
-                        >
-                          <PreviewIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                    <Tooltip title="Converter">
-                      <IconButton
-                        size="small"
-                        disabled={
-                          file.progress < 100 || !isMediaFile(file.name)
-                        }
+                {!isWaitingSelection && (
+                  <>
+                    <TableCell>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                          width: 120,
+                        }}
                       >
-                        <TransformIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </Box>
-                </TableCell>
+                        <LinearProgress
+                          variant="determinate"
+                          value={file.progress}
+                          sx={{
+                            flex: 1,
+                            height: 4,
+                            borderRadius: 2,
+                            backgroundColor: "rgba(255,255,255,0.1)",
+                            "& .MuiLinearProgress-bar": {
+                              backgroundColor:
+                                file.progress === 100 ? "#4CAF50" : "#FF0000",
+                            },
+                          }}
+                        />
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ minWidth: 35 }}
+                        >
+                          {file.progress.toFixed(0)}%
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "flex-end",
+                          gap: 0.5,
+                        }}
+                      >
+                        {/* Download individual file */}
+                        {file.progress === 100 && (
+                          <Tooltip title="Baixar arquivo">
+                            <IconButton
+                              size="small"
+                              onClick={() => {
+                                const url = `${apiBaseUrl}/api/torrent/stream/${torrent.job_id}/${file.index}`;
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download =
+                                  file.name.split("/").pop() || file.name;
+                                a.click();
+                              }}
+                              sx={{ color: "#4CAF50" }}
+                            >
+                              <DownloadIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {file.progress > 10 && isMediaFile(file.name) && (
+                          <Tooltip title="Preview">
+                            <IconButton
+                              size="small"
+                              onClick={() => onPreview(file)}
+                            >
+                              <PreviewIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        <Tooltip title="Converter">
+                          <IconButton
+                            size="small"
+                            disabled={
+                              file.progress < 100 || !isMediaFile(file.name)
+                            }
+                          >
+                            <TransformIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                  </>
+                )}
               </TableRow>
             ))}
           </TableBody>
@@ -1115,8 +1341,29 @@ const TorrentFilesDialog: React.FC<TorrentFilesDialogProps> = ({
         sx={{ p: 2, borderTop: "1px solid rgba(255,255,255,0.1)" }}
       >
         <Button onClick={onClose} sx={{ color: "text.secondary" }}>
-          Fechar
+          {isWaitingSelection ? "Cancelar" : "Fechar"}
         </Button>
+        {isWaitingSelection && (
+          <Button
+            variant="contained"
+            onClick={handleStartDownload}
+            disabled={loading || selectedFiles.length === 0}
+            startIcon={
+              loading ? (
+                <CircularProgress size={18} color="inherit" />
+              ) : (
+                <CloudDownloadIcon />
+              )
+            }
+            sx={{
+              backgroundColor: "#FF0000",
+              "&:hover": { backgroundColor: "#CC0000" },
+            }}
+          >
+            Iniciar Download ({selectedFiles.length} arquivo
+            {selectedFiles.length !== 1 ? "s" : ""})
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );

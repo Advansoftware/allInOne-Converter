@@ -8,6 +8,7 @@ import asyncio
 import json
 import re
 from typing import Optional, List
+from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -16,6 +17,7 @@ from pydantic_settings import BaseSettings
 import redis
 import httpx
 import yt_dlp
+import pusher
 
 
 class Settings(BaseSettings):
@@ -25,7 +27,7 @@ class Settings(BaseSettings):
     converter_service_url: str = "http://converter:8000"
     pusher_host: str = "websocket"
     pusher_port: int = 6001
-    pusher_app_id: str = "allone-app"
+    pusher_app_id: str = "100001"  # Must match Soketi config
     pusher_key: str = "allone-key"
     pusher_secret: str = "allone-secret"
     
@@ -50,6 +52,16 @@ redis_client = redis.Redis(
     host=settings.redis_host,
     port=settings.redis_port,
     decode_responses=True
+)
+
+# Pusher client for broadcasting (same as torrent service)
+pusher_client = pusher.Pusher(
+    app_id=settings.pusher_app_id,
+    key=settings.pusher_key,
+    secret=settings.pusher_secret,
+    host=settings.pusher_host,
+    port=settings.pusher_port,
+    ssl=False
 )
 
 
@@ -115,70 +127,35 @@ async def download_thumbnail(url: str, job_id: str) -> Optional[str]:
     return url
 
 
-async def send_websocket_event(job_id: str, status: str, progress: float = 0,
-                                title: str = None, output_path: str = None,
-                                error: str = None, thumbnail: str = None):
-    """Send event to Soketi WebSocket server via HTTP API"""
-    import hashlib
-    import hmac
-    import time
-    
+def broadcast_job_update(job_id: str, status: str, progress: float = 0,
+                         title: str = None, output_path: str = None,
+                         error: str = None, thumbnail: str = None):
+    """Broadcast job update via Pusher/Soketi WebSocket"""
     try:
-        # Pusher HTTP API format for Soketi
-        channel = "jobs"
-        event = "job.updated"
-        
-        data = {
+        event_data = {
             "job_id": job_id,
             "type": "download",
             "status": status,
-            "progress": progress,
+            "progress": int(progress),
             "file_name": title or "",
             "error": error,
             "metadata": {
                 "output_path": output_path or "",
-                "thumbnail": thumbnail or ""
+                "thumbnail": thumbnail or "",
+                "title": title or ""
             },
-            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
-        
-        body = json.dumps({
-            "name": event,
-            "channel": channel,
-            "data": json.dumps(data)
-        })
-        
-        # Create auth signature
-        timestamp = str(int(time.time()))
-        body_md5 = hashlib.md5(body.encode()).hexdigest()
-        
-        string_to_sign = f"POST\n/apps/{settings.pusher_app_id}/events\nauth_key={settings.pusher_key}&auth_timestamp={timestamp}&auth_version=1.0&body_md5={body_md5}"
-        signature = hmac.new(
-            settings.pusher_secret.encode(),
-            string_to_sign.encode(),
-            hashlib.sha256
-        ).hexdigest()
-        
-        url = f"http://{settings.pusher_host}:{settings.pusher_port}/apps/{settings.pusher_app_id}/events"
-        params = {
-            "auth_key": settings.pusher_key,
-            "auth_timestamp": timestamp,
-            "auth_version": "1.0",
-            "body_md5": body_md5,
-            "auth_signature": signature
-        }
-        
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            await client.post(url, params=params, content=body, headers={"Content-Type": "application/json"})
-            
+        pusher_client.trigger('jobs', 'job.updated', event_data)
+        print(f"📡 Broadcast: {job_id} - {status} - {progress}%")
     except Exception as e:
-        print(f"WebSocket event error: {e}")
+        print(f"Failed to broadcast job update: {e}")
 
 
 def update_job_status(job_id: str, status: str, progress: float = 0,
                       title: str = None, output_path: str = None, 
                       error: str = None, thumbnail: str = None):
-    """Update job status in Redis and send WebSocket event"""
+    """Update job status in Redis and broadcast via WebSocket"""
     job_data = {
         "job_id": job_id,
         "status": status,
@@ -194,14 +171,8 @@ def update_job_status(job_id: str, status: str, progress: float = 0,
     # Publish status update to Redis
     redis_client.publish(f"download:status:{job_id}", json.dumps(job_data))
     
-    # Send WebSocket event (fire and forget)
-    try:
-        asyncio.create_task(send_websocket_event(
-            job_id, status, progress, title, output_path, error, thumbnail
-        ))
-    except RuntimeError:
-        # No event loop running, skip websocket
-        pass
+    # Broadcast via Pusher/WebSocket
+    broadcast_job_update(job_id, status, progress, title, output_path, error, thumbnail)
 
 
 class DownloadProgressHook:
@@ -248,12 +219,26 @@ async def run_download(job_id: str, url: str, format_id: str, convert_to: str = 
     progress_hook = DownloadProgressHook(job_id)
     
     ydl_opts = {
-        'format': format_id,
+        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',  # Prefer MP4
         'outtmpl': output_template,
         'progress_hooks': [progress_hook],
         'noplaylist': True,
         'quiet': True,
         'no_warnings': True,
+        'js_runtimes': {'node': {}},  # Use Node.js for JS challenges (required for YouTube)
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'web'],  # Use multiple clients for better format availability
+            }
+        },
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+        'retries': 3,
+        'fragment_retries': 3,
+        'file_access_retries': 3,
+        'ignoreerrors': False,
+        'no_check_certificate': True,
     }
     
     try:
@@ -263,6 +248,7 @@ async def run_download(job_id: str, url: str, format_id: str, convert_to: str = 
             'quiet': True,
             'no_warnings': True,
             'skip_download': True,
+            'js_runtimes': {'node': {}},  # Use Node.js for JS challenges (required for YouTube)
         }
         
         # Check if thumbnail already cached

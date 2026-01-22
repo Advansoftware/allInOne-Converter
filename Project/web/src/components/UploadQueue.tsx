@@ -116,9 +116,9 @@ export default function UploadQueue({
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <CloudDownloadIcon
               fontSize="small"
-              sx={{ color: "#2196F3", animation: "pulse 1.5s infinite" }}
+              sx={{ color: "#FF0000", animation: "pulse 1.5s infinite" }}
             />
-            <Typography variant="body2" sx={{ color: "#2196F3" }}>
+            <Typography variant="body2" sx={{ color: "#FF0000" }}>
               Baixando {item.progress.toFixed(0)}%
             </Typography>
           </Box>
@@ -158,8 +158,8 @@ export default function UploadQueue({
       default:
         return (
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <CloudDownloadIcon fontSize="small" sx={{ color: "#2196F3" }} />
-            <Typography variant="body2" sx={{ color: "#2196F3" }}>
+            <CloudDownloadIcon fontSize="small" sx={{ color: "#FF0000" }} />
+            <Typography variant="body2" sx={{ color: "#FF0000" }}>
               {item.progress.toFixed(0)}%
             </Typography>
           </Box>
@@ -324,10 +324,7 @@ export default function UploadQueue({
                               size={36}
                               thickness={4}
                               sx={{
-                                color:
-                                  row.status === "downloading"
-                                    ? "#2196F3"
-                                    : "#FF0000",
+                                color: "#FF0000",
                                 "& .MuiCircularProgress-circle": {
                                   strokeLinecap: "round",
                                 },
@@ -429,20 +426,23 @@ export default function UploadQueue({
                     </Tooltip>
                   )}
 
-                  {onPreview && (
-                    <Tooltip title="Preview">
-                      <IconButton
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onPreview(row.id);
-                        }}
-                        sx={{ color: "#aaa" }}
-                      >
-                        <PreviewIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  )}
+                  {/* Preview only for conversion/download, not torrents */}
+                  {onPreview &&
+                    row.type !== "torrent" &&
+                    row.status === "completed" && (
+                      <Tooltip title="Preview">
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onPreview(row.id);
+                          }}
+                          sx={{ color: "#aaa" }}
+                        >
+                          <PreviewIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
 
                   {/* Convert button - only for completed downloads */}
                   {row.type === "download" &&
@@ -467,7 +467,8 @@ export default function UploadQueue({
                       </Tooltip>
                     )}
 
-                  {row.status === "completed" && (
+                  {/* Download only for conversion/download completed, not torrents */}
+                  {row.status === "completed" && row.type !== "torrent" && (
                     <Tooltip title="Baixar arquivo">
                       <IconButton
                         size="small"

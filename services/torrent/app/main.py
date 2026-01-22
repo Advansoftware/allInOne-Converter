@@ -9,7 +9,7 @@ import json
 import hashlib
 import tempfile
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -18,6 +18,7 @@ from pydantic_settings import BaseSettings
 import redis
 import httpx
 import aiofiles
+import pusher
 
 # Try to import libtorrent, fallback to mock if not available
 try:
@@ -34,6 +35,11 @@ class Settings(BaseSettings):
     download_path: str = "/app/downloads"
     converter_service_url: str = "http://converter:8000"
     streamer_service_url: str = "http://streamer:8000"
+    pusher_app_id: str = "100001"
+    pusher_key: str = "allone-key"
+    pusher_secret: str = "allone-secret"
+    pusher_host: str = "websocket"
+    pusher_port: int = 6001
     
     class Config:
         env_file = ".env"
@@ -56,6 +62,16 @@ redis_client = redis.Redis(
     host=settings.redis_host,
     port=settings.redis_port,
     decode_responses=True
+)
+
+# Pusher client for broadcasting
+pusher_client = pusher.Pusher(
+    app_id=settings.pusher_app_id,
+    key=settings.pusher_key,
+    secret=settings.pusher_secret,
+    host=settings.pusher_host,
+    port=settings.pusher_port,
+    ssl=False
 )
 
 # Torrent session
@@ -109,18 +125,70 @@ def get_job_key(job_id: str) -> str:
     return f"torrent:job:{job_id}"
 
 
+def broadcast_job_update(job_id: str, status: str, progress: float = 0,
+                         file_name: str = None, error: str = None,
+                         thumbnail: str = None, download_rate: float = 0,
+                         upload_rate: float = 0, num_peers: int = 0, 
+                         num_seeds: int = 0, files: list = None):
+    """Broadcast job update via Pusher/Soketi"""
+    try:
+        # Convert thumbnail path to URL if it exists
+        thumbnail_url = None
+        if thumbnail:
+            filename = os.path.basename(thumbnail)
+            thumbnail_url = f"http://localhost:8080/api/thumbnails/{filename}"
+        
+        event_data = {
+            "job_id": job_id,
+            "type": "torrent",
+            "status": status,
+            "progress": int(progress),
+            "file_name": file_name,
+            "error": error,
+            "metadata": {
+                "thumbnail": thumbnail_url,
+                "download_rate": download_rate,
+                "upload_rate": upload_rate,
+                "num_peers": num_peers,
+                "num_seeds": num_seeds,
+                "files": files
+            },
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        pusher_client.trigger('jobs', 'job.updated', event_data)
+    except Exception as e:
+        print(f"Failed to broadcast torrent job update: {e}")
+
+
 def update_job_status(job_id: str, data: dict):
-    """Update job status in Redis"""
-    for key, value in data.items():
-        if isinstance(value, (list, dict)):
-            data[key] = json.dumps(value)
+    """Update job status in Redis and broadcast via WebSocket"""
+    # Get data before JSON serialization
+    file_name = data.get("name")
+    status = data.get("status", "unknown")
+    progress = float(data.get("progress", 0))
+    error = data.get("error")
+    thumbnail = data.get("thumbnail")
+    download_rate = float(data.get("download_rate", 0))
+    upload_rate = float(data.get("upload_rate", 0))
+    num_peers = int(data.get("num_peers", 0))
+    num_seeds = int(data.get("num_seeds", 0))
+    files = data.get("files")  # Already a list
     
-    redis_client.hset(get_job_key(job_id), mapping=data)
+    # Serialize lists/dicts for Redis
+    data_for_redis = data.copy()
+    for key, value in data_for_redis.items():
+        if isinstance(value, (list, dict)):
+            data_for_redis[key] = json.dumps(value)
+    
+    redis_client.hset(get_job_key(job_id), mapping=data_for_redis)
     redis_client.expire(get_job_key(job_id), 86400 * 7)  # 7 days expiry
     
-    # Publish status update
-    redis_client.publish(f"torrent:status:{job_id}", json.dumps(data))
-
+    # Publish status update via Redis
+    redis_client.publish(f"torrent:status:{job_id}", json.dumps(data_for_redis))
+    
+    # Broadcast via Pusher/WebSocket with all data
+    broadcast_job_update(job_id, status, progress, file_name, error, thumbnail,
+                         download_rate, upload_rate, num_peers, num_seeds, files)
 
 def get_session():
     """Get or create libtorrent session"""

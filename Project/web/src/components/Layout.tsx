@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Box,
   Toolbar,
@@ -9,6 +9,7 @@ import {
 import TopBar from "./TopBar";
 import Sidebar from "./Sidebar";
 import { torrentService } from "../services/api";
+import websocketService from "../services/websocket";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -19,25 +20,52 @@ const Layout = ({ children }: LayoutProps) => {
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [open, setOpen] = useState(true);
   const [activeTorrents, setActiveTorrents] = useState(0);
+  const torrentsMapRef = useRef<Map<string, string>>(new Map());
 
-  // Fetch active torrents count for badge
+  // Load initial torrents count once and use WebSocket for updates
   useEffect(() => {
-    const fetchTorrents = async () => {
+    // Initial fetch only once
+    const fetchInitialTorrents = async () => {
       try {
         const response = await torrentService.list();
-        const downloading =
-          response.data.torrents?.filter(
-            (t: any) => t.status === "downloading" || t.status === "metadata",
-          ).length || 0;
+        const torrents = response.data.torrents || [];
+        // Build initial map
+        torrentsMapRef.current.clear();
+        torrents.forEach((t: any) => {
+          torrentsMapRef.current.set(t.job_id, t.status);
+        });
+        // Count active
+        const downloading = torrents.filter(
+          (t: any) => t.status === "downloading" || t.status === "metadata",
+        ).length;
         setActiveTorrents(downloading);
       } catch {
         // Ignore errors
       }
     };
 
-    fetchTorrents();
-    const interval = setInterval(fetchTorrents, 5000);
-    return () => clearInterval(interval);
+    fetchInitialTorrents();
+
+    // Subscribe to WebSocket updates for real-time count
+    const unsubscribe = websocketService.onJobUpdate((update) => {
+      if (update.type !== "torrent") return;
+
+      // Update our local map
+      torrentsMapRef.current.set(update.job_id, update.status);
+
+      // Recalculate active count
+      let activeCount = 0;
+      torrentsMapRef.current.forEach((status) => {
+        if (status === "downloading" || status === "metadata") {
+          activeCount++;
+        }
+      });
+      setActiveTorrents(activeCount);
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const toggleDrawer = () => {

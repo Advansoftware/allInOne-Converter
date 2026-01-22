@@ -61,7 +61,7 @@ const statusConfig = {
   },
   downloading: {
     label: "Baixando",
-    color: "#2196F3",
+    color: "#FF0000",
     icon: <CloudDownloadIcon />,
   },
   converting: {
