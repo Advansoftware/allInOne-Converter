@@ -77,11 +77,13 @@ Route::prefix('stream')->group(function () {
     Route::get('/status/{streamId}', [StreamController::class, 'status']);
     Route::post('/preview', [StreamController::class, 'preview']);
     Route::get('/thumbnail', [StreamController::class, 'thumbnail']);
-    Route::get('/{streamId}/playlist.m3u8', [StreamController::class, 'playlist']);
-    Route::get('/{streamId}/{segment}', [StreamController::class, 'segment']);
     Route::delete('/preview/{previewId}', [StreamController::class, 'deletePreview']);
     Route::post('/cache/cleanup', [StreamController::class, 'cleanupCache']);
+    // Video streaming by job ID - must be before generic routes
     Route::get('/video/{jobId}', [StreamController::class, 'streamByJobId']);
+    // HLS streaming routes (generic params last)
+    Route::get('/{streamId}/playlist.m3u8', [StreamController::class, 'playlist']);
+    Route::get('/{streamId}/{segment}', [StreamController::class, 'segment']);
 });
 
 // Thumbnails route - serve cached thumbnails

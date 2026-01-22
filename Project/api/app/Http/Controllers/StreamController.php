@@ -165,26 +165,41 @@ class StreamController extends Controller
         try {
             // Get job info from Redis
             $redis = \Illuminate\Support\Facades\Redis::connection('jobs');
-            $jobData = $redis->get("job:{$jobId}");
+            $filePath = null;
             
-            // Also check hash format used by downloader
-            if (!$jobData) {
-                $hashData = $redis->hgetall("download:job:{$jobId}");
-                if (!empty($hashData)) {
-                    $jobData = json_encode($hashData);
+            // Check conversion jobs first (most common)
+            $jobData = $redis->hgetall("conversion:job:{$jobId}");
+            if (!empty($jobData)) {
+                $filePath = $jobData['output_path'] ?? null;
+            }
+            
+            // Check download jobs
+            if (!$filePath) {
+                $jobData = $redis->hgetall("download:job:{$jobId}");
+                if (!empty($jobData)) {
+                    $filePath = $jobData['output_path'] ?? null;
                 }
             }
             
-            if (!$jobData) {
-                return response()->json(['error' => 'Job not found'], 404);
+            // Check torrent jobs
+            if (!$filePath) {
+                $jobData = $redis->hgetall("torrent:job:{$jobId}");
+                if (!empty($jobData)) {
+                    $filePath = $jobData['output_path'] ?? null;
+                }
             }
             
-            $data = is_string($jobData) ? json_decode($jobData, true) : $jobData;
+            // Legacy format
+            if (!$filePath) {
+                $legacyData = $redis->get("job:{$jobId}");
+                if ($legacyData) {
+                    $data = json_decode($legacyData, true);
+                    $filePath = $data['output_path'] ?? null;
+                }
+            }
             
-            // For streaming, we allow any status that has output_path (even during download)
-            $filePath = $data['output_path'] ?? null;
             if (!$filePath || !file_exists($filePath)) {
-                return response()->json(['error' => 'File not available yet'], 404);
+                return response()->json(['error' => 'File not available'], 404);
             }
             
             // Get file info
