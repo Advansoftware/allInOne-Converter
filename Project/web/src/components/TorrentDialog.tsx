@@ -40,6 +40,7 @@ interface TorrentDialogProps {
   open: boolean;
   onClose: () => void;
   onTorrentAdded: (jobId: string, name: string) => void;
+  initialMagnetUrl?: string;
 }
 
 interface TabPanelProps {
@@ -69,15 +70,40 @@ const TorrentDialog: React.FC<TorrentDialogProps> = ({
   open,
   onClose,
   onTorrentAdded,
+  initialMagnetUrl = "",
 }) => {
   const [tab, setTab] = useState(0);
-  const [magnetUrl, setMagnetUrl] = useState("");
+  const [magnetUrl, setMagnetUrl] = useState(initialMagnetUrl);
   const [torrentFile, setTorrentFile] = useState<File | null>(null);
   const [parsedInfo, setParsedInfo] = useState<any>(null);
   const [selectedFiles, setSelectedFiles] = useState<number[]>([]);
   const [convertProfile, setConvertProfile] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Update magnetUrl when initialMagnetUrl changes and auto-parse
+  React.useEffect(() => {
+    if (initialMagnetUrl && open) {
+      setMagnetUrl(initialMagnetUrl);
+      setTab(0); // Switch to magnet tab
+      // Auto-parse the magnet
+      handleParseMagnetAuto(initialMagnetUrl);
+    }
+  }, [initialMagnetUrl, open]);
+
+  const handleParseMagnetAuto = async (url: string) => {
+    if (!url.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const info = await parseMagnet(url);
+      setParsedInfo(info);
+    } catch (err: any) {
+      setError(err.message || "Erro ao analisar magnet link");
+    } finally {
+      setLoading(false);
+    }
+  };
   const [showConversionModal, setShowConversionModal] = useState(false);
   const [pendingTorrentData, setPendingTorrentData] = useState<{
     type: "magnet" | "file";

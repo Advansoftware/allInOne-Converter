@@ -653,8 +653,12 @@ export default function DialogUpload({
 
       <TorrentDialog
         open={showTorrent}
-        onClose={() => setShowTorrent(false)}
+        onClose={() => {
+          setShowTorrent(false);
+          setUrl(""); // Clear URL when closing torrent dialog
+        }}
         onTorrentAdded={handleTorrentAdded}
+        initialMagnetUrl={urlType === "magnet" ? url : ""}
       />
     </div>
   );

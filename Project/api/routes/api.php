@@ -69,6 +69,9 @@ Route::prefix('torrent')->group(function () {
     Route::delete('/{jobId}', [TorrentController::class, 'remove']);
     Route::get('/files/{jobId}', [TorrentController::class, 'files']);
     Route::get('/list', [TorrentController::class, 'list']);
+    // Stream torrent file (must be after /files to avoid conflict)
+    Route::get('/stream/{jobId}/{fileIndex}', [TorrentController::class, 'stream'])
+        ->where('fileIndex', '[0-9]+');
 });
 
 // Stream routes

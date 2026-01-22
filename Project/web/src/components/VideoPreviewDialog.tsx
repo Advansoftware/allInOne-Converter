@@ -40,6 +40,7 @@ interface VideoPreviewDialogProps {
   name: string;
   status: string;
   outputPath?: string;
+  customStreamUrl?: string; // For torrent streaming or other custom sources
 }
 
 const formatTime = (seconds: number): string => {
@@ -68,6 +69,7 @@ const VideoPreviewDialog: React.FC<VideoPreviewDialogProps> = ({
   name,
   status,
   outputPath,
+  customStreamUrl,
 }) => {
   const apiBaseUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -100,10 +102,12 @@ const VideoPreviewDialog: React.FC<VideoPreviewDialogProps> = ({
 
   // Preview is available whenever we have a jobId (streaming works during download)
   // Only fails for 'failed' status
-  const isPreviewAvailable = status !== "failed" && jobId;
-  const streamUrl = isPreviewAvailable
-    ? `${apiBaseUrl}/api/stream/video/${jobId}`
-    : null;
+  const isPreviewAvailable = status !== "failed" && (jobId || customStreamUrl);
+  const streamUrl = customStreamUrl
+    ? customStreamUrl
+    : isPreviewAvailable
+      ? `${apiBaseUrl}/api/stream/video/${jobId}`
+      : null;
   const [videoError, setVideoError] = useState(false);
 
   // Reset state when dialog opens or job changes

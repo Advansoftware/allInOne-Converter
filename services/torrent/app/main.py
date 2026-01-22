@@ -10,9 +10,9 @@ import hashlib
 import tempfile
 from typing import Optional, List
 from datetime import datetime
-from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings
 import redis
@@ -603,6 +603,111 @@ async def list_torrents():
             })
     
     return {"torrents": torrents}
+
+
+@app.get("/stream/{job_id}/{file_index}")
+async def stream_torrent_file(job_id: str, file_index: int, request: Request):
+    """Stream a file from torrent (supports partial downloads)"""
+    
+    # Get job info from Redis
+    job_data = redis_client.hgetall(get_job_key(job_id))
+    if not job_data:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Get files list
+    files = []
+    if job_data.get("files"):
+        try:
+            files = json.loads(job_data["files"])
+        except:
+            pass
+    
+    if file_index >= len(files):
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    file_info = files[file_index]
+    file_name = file_info.get("name", "")
+    
+    # Construct file path
+    download_dir = os.path.join(settings.download_path, job_id)
+    file_path = os.path.join(download_dir, file_name)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+    
+    file_size = os.path.getsize(file_path)
+    
+    # Get content type based on extension
+    ext = file_name.split(".")[-1].lower()
+    content_types = {
+        "mp4": "video/mp4",
+        "mkv": "video/x-matroska",
+        "avi": "video/x-msvideo",
+        "webm": "video/webm",
+        "mov": "video/quicktime",
+        "mp3": "audio/mpeg",
+        "flac": "audio/flac",
+        "wav": "audio/wav",
+    }
+    content_type = content_types.get(ext, "application/octet-stream")
+    
+    # Handle range requests for seeking
+    range_header = request.headers.get("range")
+    
+    if range_header:
+        # Parse range header
+        range_match = range_header.replace("bytes=", "").split("-")
+        start = int(range_match[0]) if range_match[0] else 0
+        end = int(range_match[1]) if range_match[1] else file_size - 1
+        
+        # Don't go beyond what's downloaded
+        if end >= file_size:
+            end = file_size - 1
+        
+        content_length = end - start + 1
+        
+        async def stream_range():
+            async with aiofiles.open(file_path, "rb") as f:
+                await f.seek(start)
+                remaining = content_length
+                chunk_size = 65536  # 64KB chunks
+                while remaining > 0:
+                    read_size = min(chunk_size, remaining)
+                    data = await f.read(read_size)
+                    if not data:
+                        break
+                    remaining -= len(data)
+                    yield data
+        
+        return StreamingResponse(
+            stream_range(),
+            status_code=206,
+            media_type=content_type,
+            headers={
+                "Content-Range": f"bytes {start}-{end}/{file_size}",
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(content_length),
+            }
+        )
+    else:
+        # Full file stream
+        async def stream_full():
+            async with aiofiles.open(file_path, "rb") as f:
+                chunk_size = 65536
+                while True:
+                    data = await f.read(chunk_size)
+                    if not data:
+                        break
+                    yield data
+        
+        return StreamingResponse(
+            stream_full(),
+            media_type=content_type,
+            headers={
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(file_size),
+            }
+        )
 
 
 if __name__ == "__main__":
