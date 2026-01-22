@@ -5,26 +5,15 @@ import Toolbar from "@mui/material/Toolbar";
 import IconButton from "@mui/material/IconButton";
 import Typography from "@mui/material/Typography";
 import Menu from "@mui/material/Menu";
-import MenuIcon from "@mui/icons-material/Menu";
 import Container from "@mui/material/Container";
 import Avatar from "@mui/material/Avatar";
-import Button from "@mui/material/Button";
 import Tooltip from "@mui/material/Tooltip";
 import MenuItem from "@mui/material/MenuItem";
-import AdbIcon from "@mui/icons-material/Adb";
 import LogoImage from "../assets/logo_white.png";
-import styled from "styled-components";
 import ButtonConverter from "./ButtonConverter";
+
 const settings = ["Minha Conta", "Sair"];
 
-const Logo = styled.img`
-  /* This renders the buttons above... Edit me! */
-  display: inline-block;
-  width: 11rem;
-  margin-left: 1rem;
-`;
-
-// Corrige tipagem do props
 interface NavbarProps {
   setOpenModal: () => void;
 }
@@ -65,7 +54,16 @@ function Navbar({ setOpenModal }: NavbarProps) {
       }}
     >
       <Toolbar disableGutters sx={{ width: "99%" }}>
-        <Logo src={LogoImage} alt="logo" />
+        <Box
+          component="img"
+          src={LogoImage}
+          alt="logo"
+          sx={{
+            display: "inline-block",
+            width: { xs: "8rem", sm: "11rem" },
+            ml: { xs: 1, sm: 2 },
+          }}
+        />
         <Box sx={{ flexGrow: 1 }} />
         <Box mr={2}>
           <ButtonConverter onClick={setOpenModal}>Converter</ButtonConverter>

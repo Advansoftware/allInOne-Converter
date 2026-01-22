@@ -3,53 +3,39 @@ import {
   Box,
   Button,
   Grid,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
   Typography,
 } from "@mui/material";
-import { useDropzone } from "react-dropzone";
-import styled from "styled-components";
+import { useDropzone, DropzoneOptions } from "react-dropzone";
 import ModalImage from "../assets/modalImage.svg";
 
-const Logo = styled.img`
-  width: 10rem;
-  filter: drop-shadow(0 2px 12px #ff000055);
-`;
+interface DropzoneProps {
+  disabled?: boolean;
+  setStarter?: (value: boolean) => void;
+  files?: File[];
+  onDrop?: (acceptedFiles: File[]) => void;
+}
+
 const Dropzone = ({
-  disabled,
+  disabled = false,
   setStarter,
-  submitFile,
-  setOpenFile,
   files,
-  getFilesFromEvent,
-  maxFiles,
-  maxSize,
-  minSize,
-  multiple,
-  noClick,
-  noDrag,
-  noDragEventsBubbling,
-  noKeyboard,
   onDrop,
-}) => {
+}: DropzoneProps) => {
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     accept: { "video/*": [], "audio/*": [], "image/*": [] },
     maxFiles: 1,
-    maxSize,
     disabled,
     multiple: false,
     noClick: true,
     noKeyboard: true,
-    minSize,
     onDrop,
-  });
+  } as DropzoneOptions);
+
   useEffect(() => {
-    if (disabled) {
+    if (disabled && setStarter) {
       setStarter(true);
     }
-  }, [disabled]);
+  }, [disabled, setStarter]);
 
   return (
     <Box
@@ -70,7 +56,15 @@ const Dropzone = ({
     >
       <input {...getInputProps()} />
       <Grid item xs={12} sx={{ textAlign: "center" }}>
-        <Logo src={ModalImage} alt="Modal Image" />
+        <Box
+          component="img"
+          src={ModalImage}
+          alt="Modal Image"
+          sx={{
+            width: "10rem",
+            filter: "drop-shadow(0 2px 12px #ff000055)",
+          }}
+        />
       </Grid>
       <Grid item>
         <Typography
