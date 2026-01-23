@@ -36,8 +36,8 @@ const Sidebar = ({ open, onClose, activeTorrents = 0 }: SidebarProps) => {
   const location = useLocation();
 
   const menuItems = [
-    { icon: <DashboardIcon />, label: "Dashboard", path: "/" },
-    { icon: <VideoLibraryIcon />, label: "Conteúdo", path: "/content" },
+    { icon: <DashboardIcon />, label: "Dashboard", path: "/dashboard" },
+    { icon: <VideoLibraryIcon />, label: "Conteúdo", path: "/dashboard/content" },
     {
       icon: (
         <Badge
@@ -58,12 +58,12 @@ const Sidebar = ({ open, onClose, activeTorrents = 0 }: SidebarProps) => {
         </Badge>
       ),
       label: "Torrents",
-      path: "/torrents",
+      path: "/dashboard/torrents",
     },
   ];
 
   const bottomItems = [
-    { icon: <SettingsIcon />, label: "Configurações", path: "/settings" },
+    { icon: <SettingsIcon />, label: "Configurações", path: "/dashboard/settings" },
   ];
 
   const isExpanded = isMobile || open;

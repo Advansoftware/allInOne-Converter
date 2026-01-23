@@ -1,27 +1,36 @@
 # 🎬 AllInOne Converter
 
-Sistema de conversão de mídia com arquitetura de microserviços, suporte a torrents, downloads de URLs e streaming HLS.
+[![Open Source](https://img.shields.io/badge/Open%20Source-❤️-red?style=for-the-badge)](https://github.com/Advansoftware/allInOne-Converter)
+[![Contributors Welcome](https://img.shields.io/badge/Contributors-Welcome-brightgreen?style=for-the-badge)](https://github.com/Advansoftware/allInOne-Converter/issues)
+[![MIT License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
 ![Docker](https://img.shields.io/badge/Docker-20.10+-blue?style=flat-square&logo=docker)
 ![Laravel](https://img.shields.io/badge/Laravel-10-red?style=flat-square&logo=laravel)
 ![React](https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react)
 ![Python](https://img.shields.io/badge/Python-3.11-yellow?style=flat-square&logo=python)
 
-## 📋 Índice
+> **Sistema open source de conversão de mídia com arquitetura de microserviços, suporte a torrents, downloads de URLs e streaming HLS.**
 
-- [Visão Geral](#-visão-geral)
-- [Arquitetura](#-arquitetura)
-- [Requisitos](#-requisitos)
-- [Instalação](#-instalação)
-- [Uso](#-uso)
-- [Serviços](#-serviços)
-- [API](#-api)
-- [Comandos Make](#-comandos-make)
-- [Desenvolvimento](#-desenvolvimento)
+---
 
-## 🎯 Visão Geral
+## 🌟 Sobre o Projeto
 
-O AllInOne Converter é uma plataforma completa para:
+O AllInOne Converter é um projeto **100% open source** desenvolvido pela comunidade, para a comunidade. Nosso objetivo é criar a melhor ferramenta gratuita de conversão de mídia disponível.
+
+**Queremos você como colaborador!** Seja desenvolvedor, designer, DevOps ou entusiasta, há um lugar para você no projeto.
+
+## 📸 Screenshots
+
+<div align="center">
+  <img src="imagens/screenshot-dashboard.png" alt="Dashboard" width="45%">
+  <img src="imagens/screenshot-torrents.png" alt="Torrents" width="45%">
+</div>
+<div align="center">
+  <img src="imagens/screenshot-upload.png" alt="Upload" width="45%">
+  <img src="imagens/screenshot-torrent-detail.png" alt="Torrent Detail" width="45%">
+</div>
+
+## 🎯 Funcionalidades
 
 - 🎥 **Conversão de vídeos** - Converta entre diversos formatos (MP4, WebM, AVI, MKV, etc.)
 - 📥 **Download de URLs** - Baixe vídeos do YouTube, Vimeo e outros 1000+ sites
@@ -29,15 +38,27 @@ O AllInOne Converter é uma plataforma completa para:
 - 📺 **Streaming HLS** - Preview de arquivos em tempo real
 - ⏳ **Fila assíncrona** - Processamento em background com status em tempo real
 
+## 📋 Índice
+
+- [Arquitetura](#-arquitetura)
+- [Requisitos](#-requisitos)
+- [Instalação](#-instalação)
+- [Uso](#-uso)
+- [Serviços](#-serviços)
+- [API](#-api)
+- [Comandos Make](#-comandos-make)
+- [Contribuindo](#-contribuindo)
+- [Comunidade](#-comunidade)
+
 ## 🏗️ Arquitetura
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                          FRONTEND (React)                           │
 │                         http://localhost:3000                        │
-└─────────────────────────────────┬───────────────────────────────────┘
-                                  │
-                                  ▼
+└─────────────────────────────┬───────────────────────────────────────┘
+                              │
+                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        API GATEWAY (Laravel)                         │
 │                         http://localhost:8080                        │
@@ -53,15 +74,15 @@ O AllInOne Converter é uma plataforma completa para:
 └───────┬───────┘ └───────┬───────┘ └───────┬───────┘ └───────┬───────┘
         │               │               │               │
         └───────────────┴───────────────┴───────────────┘
-                                  │
-                    ┌─────────────┴─────────────┐
-                    │                           │
-                    ▼                           ▼
-          ┌─────────────────┐         ┌─────────────────┐
-          │      REDIS      │         │     MYSQL       │
-          │    (Queue)      │         │   (Database)    │
-          │     :6379       │         │     :3306       │
-          └─────────────────┘         └─────────────────┘
+                              │
+                ┌─────────────┴─────────────┐
+                │                           │
+                ▼                           ▼
+      ┌─────────────────┐         ┌─────────────────┐
+      │      REDIS      │         │     MYSQL       │
+      │    (Queue)      │         │   (Database)    │
+      │     :6379       │         │     :3306       │
+      └─────────────────┘         └─────────────────┘
 ```
 
 ### Volumes Compartilhados
@@ -87,7 +108,12 @@ mysql-data/        → Dados do MySQL
 ### Clone o repositório
 
 ```bash
-git clone https://github.com/seu-usuario/allInOne-Converter.git
+# Via HTTPS
+git clone https://github.com/Advansoftware/allInOne-Converter.git
+
+# Ou via SSH
+git clone git@github.com:Advansoftware/allInOne-Converter.git
+
 cd allInOne-Converter
 ```
 
@@ -295,6 +321,8 @@ make prune           # Limpa recursos não usados
 allInOne-Converter/
 ├── docker-compose.yml     # Orquestração Docker
 ├── Makefile              # Comandos de automação
+├── index.html            # Landing page do projeto
+├── imagens/              # Screenshots e assets
 ├── services/             # Microserviços
 │   ├── api/              # Configurações do API Gateway
 │   ├── converter/        # Serviço de conversão (Python)
@@ -334,23 +362,74 @@ Edite `Project/web/src/conversionProfiles.json`:
 }
 ```
 
-### Contribuindo
+---
 
-1. Fork o projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/nova-feature`)
-3. Commit suas mudanças (`git commit -m 'Adiciona nova feature'`)
-4. Push para a branch (`git push origin feature/nova-feature`)
-5. Abra um Pull Request
+## 🤝 Contribuindo
+
+Adoramos contribuições! Este é um projeto comunitário e **você é bem-vindo** para participar.
+
+### Como Contribuir
+
+1. **Fork** o projeto
+2. Crie uma **branch** para sua feature (`git checkout -b feature/nova-feature`)
+3. **Commit** suas mudanças (`git commit -m 'Adiciona nova feature'`)
+4. **Push** para a branch (`git push origin feature/nova-feature`)
+5. Abra um **Pull Request**
+
+### Tipos de Contribuição
+
+| Tipo | Descrição |
+|------|-----------|
+| 💻 **Código** | Novas features, correções de bugs, refatorações |
+| 🐛 **Bug Reports** | Encontrou um bug? Abra uma issue! |
+| 💡 **Ideias** | Sugestões de melhorias são sempre bem-vindas |
+| 📖 **Documentação** | Ajude a melhorar os docs |
+| 🌐 **Traduções** | Ajude a traduzir para outros idiomas |
+| 🎨 **Design** | Melhorias de UI/UX |
+| 🧪 **Testes** | Escreva testes para aumentar a cobertura |
+
+### Boas Práticas
+
+- Siga os padrões de código do projeto
+- Escreva commits claros e descritivos
+- Atualize a documentação quando necessário
+- Teste suas alterações localmente antes de enviar
+
+### First-Time Contributors
+
+Novo no projeto? Procure issues marcadas com:
+- `good first issue` - Ideais para começar
+- `help wanted` - Precisamos de ajuda aqui!
+
+## 🌐 Comunidade
+
+Junte-se à nossa comunidade!
+
+- 📫 **Issues**: [GitHub Issues](https://github.com/Advansoftware/allInOne-Converter/issues)
+- 💬 **Discussões**: [GitHub Discussions](https://github.com/Advansoftware/allInOne-Converter/discussions)
+
+### Código de Conduta
+
+Respeitamos todos os colaboradores. Por favor, seja respeitoso e construtivo em todas as interações.
 
 ## 📄 Licença
 
-Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+Este projeto está sob a licença **MIT**. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
 
-## 🤝 Suporte
-
-- 📫 Issues: [GitHub Issues](https://github.com/seu-usuario/allInOne-Converter/issues)
-- 💬 Discussões: [GitHub Discussions](https://github.com/seu-usuario/allInOne-Converter/discussions)
+Isso significa que você pode:
+- ✅ Usar comercialmente
+- ✅ Modificar
+- ✅ Distribuir
+- ✅ Usar privativamente
 
 ---
 
-Desenvolvido com ❤️ usando Docker, Laravel, React e Python
+<div align="center">
+
+### ⭐ Gostou do projeto? Deixe uma estrela!
+
+[![Star on GitHub](https://img.shields.io/github/stars/Advansoftware/allInOne-Converter?style=social)](https://github.com/Advansoftware/allInOne-Converter)
+
+Desenvolvido com ❤️ pela comunidade
+
+</div>
